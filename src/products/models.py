@@ -14,7 +14,7 @@ from src.auth.types import UserId
 class Category(Base):
     __tablename__ = "categories"
     __table_args__ = (
-        sa.Index("idx_active_category", "is_active", postgresql_where=sa.text("is_text = TRUE")),
+        sa.Index("idx_active_category", "is_active", postgresql_where=sa.text("is_active = TRUE")),
     )
 
     id: so.Mapped[types.CategoryId] = so.mapped_column(autoincrement=True, primary_key=True)
@@ -34,7 +34,7 @@ class Category(Base):
 class Brand(Base):
     __tablename__ = "brands"
     __table_args__ = (
-        sa.Index("idx_active_brands", "is_active", postgresql_where=sa.text("is_text = TRUE")),
+        sa.Index("idx_active_brands", "is_active", postgresql_where=sa.text("is_active = TRUE")),
     )
 
     id: so.Mapped[types.BrandId] = so.mapped_column(primary_key=True, autoincrement=True)
@@ -64,7 +64,9 @@ class Product(Base):
     price: so.Mapped[Decimal] = so.mapped_column(sa.DECIMAL(20, 3))
     discount: so.Mapped[int | None]
     expiry_discount: so.Mapped[date | None] = so.mapped_column(sa.TIMESTAMP(timezone=True))
-    created_at: so.Mapped[datetime] = so.mapped_column(sa.TIMESTAMP(timezone=True), server_default=sa.func.now())
+    created_at: so.Mapped[datetime] = so.mapped_column(
+        sa.TIMESTAMP(timezone=True), server_default=sa.func.now()
+    )
     views: so.Mapped[int] = so.mapped_column(default=0, init=False)
     is_active: so.Mapped[bool] = so.mapped_column(default=True, init=False)
 
@@ -139,7 +141,9 @@ class Comment(Base):
 
     id: so.Mapped[types.CommentId] = so.mapped_column(autoincrement=True, primary_key=True)
     message: so.Mapped[str] = so.mapped_column(sa.Text)
-    created_at: so.Mapped[datetime] = so.mapped_column(sa.TIMESTAMP(timezone=True), server_default=sa.func.now())
+    created_at: so.Mapped[datetime] = so.mapped_column(
+        sa.TIMESTAMP(timezone=True), server_default=sa.func.now()
+    )
 
     product_id: so.Mapped[types.ProductId] = so.mapped_column(sa.ForeignKey(
         f"{Product.__tablename__}.id", ondelete="CASCADE"
@@ -151,71 +155,3 @@ class Comment(Base):
     def __repr__(self) -> str:
         return f"{self.id}"
 
-
-class Sale(Base):
-    __tablename__ = "sales"
-    __table_args__ = (
-        sa.CheckConstraint("total_quantity >= 1", name="total_quantity_check"),
-    )
-
-    id: so.Mapped[types.SaleId] = so.mapped_column(autoincrement=True, primary_key=True)
-    total_quantity: so.Mapped[int]
-    total_price: so.Mapped[Decimal] = so.mapped_column(sa.DECIMAL(20, 3))
-    created_at: so.Mapped[datetime] = so.mapped_column(sa.TIMESTAMP(timezone=True), server_default=sa.func.now())
-
-    user_id: so.Mapped[UserId | None] = so.mapped_column(sa.ForeignKey(
-        f"{User.__tablename__}.id", ondelete="SET NULL"
-    ), index=True)
-
-    def __repr__(self) -> str:
-        return f"{self.id}"
-
-
-class SaleProduct(Base):
-    __tablename__ = "saleproducts"
-    __table_args__ = (
-        sa.PrimaryKeyConstraint("sale_id", "product_id"),
-    )
-
-    sale_id: so.Mapped[types.SaleId] = so.mapped_column(sa.ForeignKey(
-        f"{Sale.__tablename__}.id", ondelete=""
-    ))
-    product_id: so.Mapped[types.ProductId] = so.mapped_column(sa.ForeignKey(
-        f"{Product.__tablename__}.id", ondelete=""
-    ))
-
-    def __repr__(self) -> str:
-        return f"sale_id: {self.sale_id}, product_id: {self.product_id}"
-
-
-class Cart(Base):
-    __tablename__ = "carts"
-
-    id: so.Mapped[types.CartId] = so.mapped_column(primary_key=True, autoincrement=True)
-    total_quantity: so.Mapped[int | None]
-    total_price: so.Mapped[Decimal | None] = so.mapped_column(sa.DECIMAL(20, 3))
-    created_at: so.Mapped[datetime] = so.mapped_column(sa.TIMESTAMP(timezone=True), server_default=sa.func.now())
-    modified_at: so.Mapped[datetime] = so.mapped_column(
-        sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), onupdate= sa.func.now()
-    )
-
-    user_id: so.Mapped[UserId] = so.mapped_column(sa.ForeignKey(
-        f"{User.__tablename__}.id", ondelete="CASCADE"
-    ), index=True)
-
-    def __repr__(self) -> str:
-        return f"{self.id}"
-
-
-class CartProduct(Base):
-    __tablename__ = "cartproduct"
-
-    cart_id: so.Mapped[types.CartId] = so.mapped_column(sa.ForeignKey(
-        f"{Cart.__tablename__}.id", ondelete="CASCADE"
-    ), index=True)
-    product_id: so.Mapped[types.ProductId] = so.mapped_column(sa.ForeignKey(
-        f"{Product.__tablename__}.id", ondelete="CASCADE"
-    ), index=True)
-
-    def __repr__(self) -> str:
-        return f"cart_id: {self.cart_id}, product_id: {self.product_id}"

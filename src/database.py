@@ -10,6 +10,8 @@ from src.constants import DB_NAMING_CONVENTION
 from src.config import settings
 from src.auth import types as auth_types
 from src.products import types as product_types
+from src.cart import types as cart_types
+from src.sales import types as sale_types
 
 POSTGRES_URL = str(settings.POSTGRES_URL)
 
@@ -31,7 +33,8 @@ class Base(MappedAsDataclass, DeclarativeBase):
         product_types.AttributeId: INTEGER,
         product_types.AttributeValueId: INTEGER,
         product_types.CommentId: INTEGER,
-        product_types.SaleId: INTEGER,
+        sale_types.SaleId: INTEGER,
+        cart_types.CartId: INTEGER
     }
 
 
