@@ -35,11 +35,16 @@ services:
     volumes:
       - devdb-volume:/var/lib/postgresql/data
 
-  adminer:
-    image: adminer
-    restart: always
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin_container
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
     ports:
-      - "8080:8080"
+      - "8080:80"
+    depends_on:
+      - dev-db
 
   redis:
     image: redis:7.2-alpine    
