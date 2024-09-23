@@ -9,6 +9,8 @@ from contextlib import asynccontextmanager
 
 from src.config import LogConfig, app_configs
 from src.auth import router as auth_router
+from src.admin import router as admin_router
+from src.products import router as products_router
 
 logger = logging.getLogger("root")
 
@@ -36,3 +38,6 @@ app.add_middleware(
 )
 
 app.include_router(router=auth_router.router, prefix="/auth", tags=["auth"])
+app.include_router(router=admin_router.router, prefix="/admin", tags=["admin"])
+app.include_router(router=products_router.router, prefix="/products", tags=["products"])
+
