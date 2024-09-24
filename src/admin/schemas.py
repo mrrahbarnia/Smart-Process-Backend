@@ -40,3 +40,11 @@ class AllCategories(CustomBaseModel):
     description: str
     is_active: bool
     parent_name: Annotated[str | None, Field(alias="parentName")] = None
+
+
+class AttributeIn(BaseModel):
+    name: Annotated[str, Field(max_length=200)]
+
+
+class AttributeList(AttributeIn):
+    id: int

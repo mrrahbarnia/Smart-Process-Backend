@@ -29,3 +29,15 @@ class CannotDeleteParentCategory(HTTPException):
     def __init__(self) -> None:
         self.status_code = status.HTTP_404_NOT_FOUND
         self.detail = "Check Check Check"
+
+
+class DuplicateAttributeName(HTTPException):
+    def __init__(self) -> None:
+        self.status_code = status.HTTP_409_CONFLICT
+        self.detail = "Unique name for attributes!"
+
+
+class AttributeNotFound(HTTPException):
+    def __init__(self) -> None:
+        self.status_code = status.HTTP_404_NOT_FOUND
+        self.detail = "There is no attribute with the provided ID!"

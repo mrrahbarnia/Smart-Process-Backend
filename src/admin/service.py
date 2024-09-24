@@ -8,8 +8,10 @@ from sqlalchemy.exc import IntegrityError
 from src.admin import schemas
 from src.admin import exceptions
 from src.pagination import paginate
-from src.products.types import CategoryId
-from src.products.models import Brand, Category
+from src.products.types import CategoryId, AttributeId
+from src.products.models import Brand, Category, Attribute
+
+# ==================== Brand service ==================== #
 
 async def create_brand(
         payload: schemas.Brand,
@@ -81,6 +83,7 @@ async def all_brands(engine: AsyncEngine, limit: int, offset: int):
         engine=engine, query=query, limit=limit, offset=offset
     )
 
+# ==================== Category service ==================== #
 
 async def add_category(
         session: async_sessionmaker[AsyncSession],
@@ -235,3 +238,75 @@ async def deactivate_category(
     )
     async with session.begin() as conn:
         await conn.execute(query)
+
+# ==================== Attribute service ==================== #
+
+async def create_attribute(
+        session: async_sessionmaker[AsyncSession],
+        payload: schemas.AttributeIn
+) -> None:
+    query = sa.insert(Attribute).values(
+        {
+            Attribute.name: payload.name
+        }
+    )
+    try:
+        async with session.begin() as conn:
+            await conn.execute(query)
+    except IntegrityError as ex:
+        if "uq_attributes_name" in str(ex):
+            raise exceptions.DuplicateAttributeName
+
+
+async def list_attributes(
+        engine: AsyncEngine,
+        limit: int,
+        offset: int,
+        name__contain: str | None
+) -> dict:
+    query = sa.select(Attribute)
+    if name__contain:
+        query = query.where(Attribute.name.ilike(f"%{name__contain}%"))
+    return await paginate(
+        query=query, engine=engine, limit=limit, offset=offset
+    )
+
+
+async def delete_attribute(
+        attribute_id: AttributeId,
+        session: async_sessionmaker[AsyncSession],
+) -> None:
+    query = (
+        sa.delete(Attribute)
+        .where(Attribute.id==attribute_id)
+        .returning(Attribute.id)
+    )
+    async with session.begin() as conn:
+        result: AttributeId | None = await conn.scalar(query)
+    if result is None:
+        raise exceptions.AttributeNotFound
+
+
+async def update_attribute(
+        attribute_id: AttributeId,
+        session: async_sessionmaker[AsyncSession],
+        payload: schemas.AttributeIn
+) -> None:
+    query = (
+        sa.update(Attribute)
+        .where(Attribute.id==attribute_id)
+        .values(
+            {
+                "name": payload.name
+            }
+        )
+        .returning(Attribute.id)
+    )
+    try:
+        async with session.begin() as conn:
+            result: AttributeId | None = await conn.scalar(query)
+        if result is None:
+            raise exceptions.AttributeNotFound
+    except IntegrityError as ex:
+        if "uq_attributes_name" in str(ex):
+            raise exceptions.DuplicateAttributeName
