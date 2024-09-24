@@ -21,6 +21,9 @@ class Category(Base):
     name: so.Mapped[str] = so.mapped_column(sa.String(150), unique=True)
     description: so.Mapped[str] = so.mapped_column(sa.Text)
     is_active: so.Mapped[bool] = so.mapped_column(default=True, init=False)
+    created_at: so.Mapped[datetime] = so.mapped_column(
+        sa.TIMESTAMP(timezone=True), server_default=sa.func.now()
+    )
 
     parent_id: so.Mapped[types.CategoryId | None] = so.mapped_column(sa.ForeignKey(
         "categories.id", ondelete="SET NULL"
