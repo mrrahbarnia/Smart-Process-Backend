@@ -1,3 +1,4 @@
+import logging
 import sqlalchemy as sa
 import sqlalchemy.orm as so
 
@@ -9,7 +10,14 @@ from src.admin import schemas
 from src.admin import exceptions
 from src.pagination import paginate
 from src.products.types import CategoryId, AttributeId
-from src.products.models import Brand, Category, Attribute
+from src.products.models import (
+    Brand,
+    Category,
+    Attribute,
+    CategoryAttribute
+)
+
+logger = logging.getLogger("admin")
 
 # ==================== Brand service ==================== #
 
@@ -310,3 +318,70 @@ async def update_attribute(
     except IntegrityError as ex:
         if "uq_attributes_name" in str(ex):
             raise exceptions.DuplicateAttributeName
+
+
+async def search_attribute(
+        session: async_sessionmaker[AsyncSession],
+        attribute_name: str
+) -> list[str]:
+    query = (
+        sa.select(Attribute.name)
+        .where(Attribute.name.ilike(f"%{attribute_name}%"))
+    )
+    async with session.begin() as conn:
+        result = (await conn.scalars(query)).all()
+    return [attr for attr in result]
+
+# ==================== CategoryAttributes service ==================== #
+
+async def assign_category_attribute(
+        session: async_sessionmaker[AsyncSession],
+        attribute_name: str,
+        category_id: CategoryId,
+) -> None:
+    attribute_id_query = sa.select(
+        Attribute.id
+    ).where(Attribute.name==attribute_name)
+    async with session.begin() as conn:
+        attribute_id: AttributeId | None = await conn.scalar(attribute_id_query)
+        if attribute_id is None:
+            raise exceptions.AttributeNotFound
+        query = sa.insert(CategoryAttribute).values(
+            {
+                CategoryAttribute.category_id: category_id,
+                CategoryAttribute.attribute_id: attribute_id
+            }
+        )
+        try:
+            await conn.execute(query)
+        except IntegrityError as ex:
+            if "fk_categoryattributes_category_id_categories" in str(ex):
+                raise exceptions.CategoryNotFound
+            if "pk_categoryattributes" in str(ex):
+                raise exceptions.CategoryAttributeUniqueTogether
+
+
+async def unassign_category_attribute(
+        session: async_sessionmaker[AsyncSession],
+        attribute_name: str,
+        category_id: CategoryId,
+) -> None:
+    attribute_id_query = sa.select(
+        Attribute.id
+    ).where(Attribute.name==attribute_name)
+    async with session.begin() as conn:
+        attribute_id: AttributeId | None = await conn.scalar(attribute_id_query)
+        if attribute_id is None:
+            raise exceptions.AttributeNotFound
+        query = sa.delete(CategoryAttribute).where(
+            sa.and_(
+                CategoryAttribute.category_id==category_id,
+                CategoryAttribute.attribute_id==attribute_id
+            )
+        ).returning(CategoryAttribute.category_id)
+        result: CategoryId | None = await conn.scalar(query)
+        if result is None:
+            raise exceptions.UnassignedWentWrong
+
+
+

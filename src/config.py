@@ -67,6 +67,10 @@ class LogConfig(BaseModel):
         'payment': {
             'handlers': ['file', 'console'],
             'propagate': False,
+        },
+        'admin': {
+            'handlers': ['file', 'console'],
+            'propagate': False,
         }
     }
 

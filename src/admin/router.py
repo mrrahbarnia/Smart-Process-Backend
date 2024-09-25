@@ -268,3 +268,54 @@ async def update_attribute(
         attribute_id=attribute_id,
         payload=payload
     )
+
+
+@router.get(
+        "/search-attribute/",
+        status_code=status.HTTP_200_OK
+)
+async def search_attribute(
+    is_admin: Annotated[bool, Depends(is_admin)],
+    attribute_name: str,
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)]
+) -> list[str]:
+    result = await service.search_attribute(
+        session=session, attribute_name=attribute_name
+    )
+    return result
+
+# ==================== CategoryAttributes routes ==================== #
+
+@router.post(
+    "/assign/category/{category_id}/attribute/{attribute_name}/",
+    status_code=status.HTTP_201_CREATED
+)
+async def assign_category_attribute(
+    category_id: CategoryId,
+    attribute_name: str,
+    is_admin: Annotated[bool, Depends(is_admin)],
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+) -> dict:
+    await service.assign_category_attribute(
+        session=session,
+        category_id=category_id,
+        attribute_name=attribute_name
+    )
+    return {"detail": "Assigned successfully."}
+
+
+@router.delete(
+    "/unassigned/category/{category_id}/attribute/{attribute_name}/",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def unassigned_category_attribute(
+    category_id: CategoryId,
+    attribute_name: str,
+    is_admin: Annotated[bool, Depends(is_admin)],
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+):
+    await service.unassign_category_attribute(
+        session=session,
+        category_id=category_id,
+        attribute_name=attribute_name
+    )

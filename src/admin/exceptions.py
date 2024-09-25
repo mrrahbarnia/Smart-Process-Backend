@@ -40,4 +40,16 @@ class DuplicateAttributeName(HTTPException):
 class AttributeNotFound(HTTPException):
     def __init__(self) -> None:
         self.status_code = status.HTTP_404_NOT_FOUND
-        self.detail = "There is no attribute with the provided ID!"
+        self.detail = "There is no attribute with the provided info!"
+
+
+class CategoryAttributeUniqueTogether(HTTPException):
+    def __init__(self) -> None:
+        self.status_code = status.HTTP_409_CONFLICT
+        self.detail = "category_id and attribute_id are unique together!"
+
+
+class UnassignedWentWrong(HTTPException):
+    def __init__(self) -> None:
+        self.status_code = status.HTTP_400_BAD_REQUEST
+        self.detail = "Unassign category and attribute went wrong!"
