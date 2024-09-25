@@ -384,4 +384,16 @@ async def unassign_category_attribute(
             raise exceptions.UnassignedWentWrong
 
 
-
+async def list_assigned_attributes(
+        category_id: CategoryId,
+        session: async_sessionmaker[AsyncSession],
+) -> list[str]:
+    query = (
+        sa.select(Attribute.name)
+        .select_from(Attribute)
+        .join(CategoryAttribute, CategoryAttribute.attribute_id==Attribute.id)
+        .where(CategoryAttribute.category_id==category_id)
+    )
+    async with session.begin() as conn:
+        result = (await conn.scalars(query)).all()
+    return [attribute_name for attribute_name in result]
