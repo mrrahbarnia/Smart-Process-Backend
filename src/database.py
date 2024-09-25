@@ -30,7 +30,6 @@ class Base(MappedAsDataclass, DeclarativeBase):
         product_types.BrandId: INTEGER,
         product_types.ProductImageId: INTEGER,
         product_types.CategoryId: INTEGER,
-        product_types.AttributeId: INTEGER,
         product_types.AttributeValueId: INTEGER,
         product_types.CommentId: INTEGER,
         sale_types.SaleId: INTEGER,

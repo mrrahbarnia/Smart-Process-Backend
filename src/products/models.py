@@ -55,6 +55,7 @@ class Product(Base):
     __table_args__ = (
         sa.CheckConstraint("stock >= 0", name="check_positive_stock"),
         sa.CheckConstraint("views >= 0", name="check_positive_views"),
+        sa.CheckConstraint("price >= 0", name="check_positive_price"),
         sa.CheckConstraint("discount BETWEEN 0 AND 100", name="check_discount_percent"),
         sa.Index("idx_active_products", "is_active", postgresql_where=sa.text("is_active = TRUE"))
     )
@@ -98,45 +99,44 @@ class ProductImage(Base):
 class Attribute(Base):
     __tablename__ = "attributes"
 
-    id: so.Mapped[types.AttributeId] = so.mapped_column(autoincrement=True, primary_key=True)
-    name: so.Mapped[str] = so.mapped_column(sa.String(200), unique=True)
+    name: so.Mapped[str] = so.mapped_column(sa.String(200), primary_key=True)
 
     def __repr__(self) -> str:
-        return f"{self.id}"
+        return f"{self.name}"
 
 
 class CategoryAttribute(Base):
     __tablename__ = "categoryattributes"
     __table_args__ = (
-        sa.PrimaryKeyConstraint("category_id", "attribute_id"),
+        sa.PrimaryKeyConstraint("category_id", "attribute_name"),
     )
 
     category_id: so.Mapped[types.CategoryId] = so.mapped_column(sa.ForeignKey(
         f"{Category.__tablename__}.id", ondelete="CASCADE"
     ), index=True)
-    attribute_id: so.Mapped[types.AttributeId] = so.mapped_column(sa.ForeignKey(
-        f"{Attribute.__tablename__}.id", ondelete="CASCADE"
+    attribute_name: so.Mapped[str] = so.mapped_column(sa.ForeignKey(
+        f"{Attribute.__tablename__}.name", ondelete="CASCADE"
     ), index=True)
 
     def __repr__(self) -> str:
-        return f"category_id: {self.category_id}, attribute_id: {self.attribute_id}"
+        return f"category_id: {self.category_id}, attribute_name: {self.attribute_name}"
 
 
 class AttributeValue(Base):
     __tablename__ = "attributevalues"
 
     id: so.Mapped[types.AttributeValueId] = so.mapped_column(autoincrement=True, primary_key=True)
-    value: so.Mapped[str] = so.mapped_column(sa.String(200))
+    value: so.Mapped[str | None] = so.mapped_column(sa.String(200))
 
-    attribute_id: so.Mapped[types.AttributeId] = so.mapped_column(sa.ForeignKey(
-        f"{Attribute.__tablename__}.id", ondelete="CASCADE"
+    attribute_name: so.Mapped[str] = so.mapped_column(sa.ForeignKey(
+        f"{Attribute.__tablename__}.name", ondelete="CASCADE"
     ), index=True)
     product_id: so.Mapped[types.ProductId | None] = so.mapped_column(sa.ForeignKey(
-        f"{Product.__tablename__}.id", ondelete="SET NULL"
+        f"{Product.__tablename__}.id", ondelete="CASCADE"
     ), index=True)
 
     def __repr__(self) -> str:
-        return f"attribute_id: {self.attribute_id}, product_id: {self.product_id}"
+        return f"attribute_name: {self.attribute_name}, product_id: {self.product_id}"
 
 
 class Comment(Base):

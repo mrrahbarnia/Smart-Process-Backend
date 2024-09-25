@@ -1,13 +1,13 @@
 from typing import Annotated
 from redis.asyncio import Redis
-from fastapi import APIRouter, status, Depends
+from fastapi import APIRouter, status, UploadFile, Depends
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, async_sessionmaker
 
 from src.database import get_session, get_redis, get_engine
 from src.pagination import PaginatedResponse, pagination_query, PaginationQuerySchema
 from src.admin import schemas
 from src.admin import service
-from src.products.types import CategoryId, AttributeId
+from src.products.types import CategoryId
 from src.auth.dependencies import is_admin
 
 router = APIRouter()
@@ -213,7 +213,7 @@ async def deactivate_category(
 async def create_attribute(
     session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
     is_admin: Annotated[bool, Depends(is_admin)],
-    payload: schemas.AttributeIn
+    payload: schemas.Attribute
 ):
     await service.create_attribute(session=session, payload=payload)
     return {"detail": "Created successfully."}
@@ -222,7 +222,7 @@ async def create_attribute(
 @router.get(
     "/list-attributes/",
     status_code=status.HTTP_200_OK,
-    response_model=PaginatedResponse[schemas.AttributeList]
+    response_model=PaginatedResponse[schemas.Attribute]
 )
 async def list_attributes(
     engine: Annotated[AsyncEngine, Depends(get_engine)],
@@ -240,32 +240,32 @@ async def list_attributes(
 
 
 @router.delete(
-    "/delete-attribute/{attribute_id}/",
+    "/delete-attribute/{attribute_name}/",
     status_code=status.HTTP_204_NO_CONTENT
 )
 async def delete_attribute(
-    attribute_id: AttributeId,
+    attribute_name: str,
     is_admin: Annotated[bool, Depends(is_admin)],
     session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
 ):
     await service.delete_attribute(
-        session=session, attribute_id=attribute_id
+        session=session, attribute_name=attribute_name
     )
 
 
 @router.put(
-    "/update-attribute/{attribute_id}",
+    "/update-attribute/{attribute_name}",
     status_code=status.HTTP_204_NO_CONTENT
 )
 async def update_attribute(
-    attribute_id: AttributeId,
-    payload: schemas.AttributeIn,
+    attribute_name: str,
+    payload: schemas.Attribute,
     is_admin: Annotated[bool, Depends(is_admin)],
     session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
 ):
     await service.update_attribute(
         session=session,
-        attribute_id=attribute_id,
+        attribute_name=attribute_name,
         payload=payload
     )
 
@@ -335,3 +335,22 @@ async def list_assigned_attributes(
         session=session
     )
     return result
+
+# ==================== Products routes ==================== #
+
+@router.post(
+    "/create-product/",
+    status_code=status.HTTP_201_CREATED
+)
+async def create_product(
+    payload: schemas.ProductIn,
+    images: list[UploadFile],
+    # is_admin: Annotated[bool, Depends(is_admin)],
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+):
+    await service.create_product(
+        session=session,
+        payload=payload,
+        images=images
+    )
+    return {"detail": "Created successfully."}

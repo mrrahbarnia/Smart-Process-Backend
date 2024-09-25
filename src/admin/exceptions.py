@@ -53,3 +53,9 @@ class UnassignedWentWrong(HTTPException):
     def __init__(self) -> None:
         self.status_code = status.HTTP_400_BAD_REQUEST
         self.detail = "Unassign category and attribute went wrong!"
+
+
+class BrandNotFound(HTTPException):
+    def __init__(self) -> None:
+        self.status_code = status.HTTP_404_NOT_FOUND
+        self.detail = "There is no brand with the provided info!"

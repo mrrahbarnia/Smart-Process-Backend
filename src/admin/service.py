@@ -2,6 +2,7 @@ import logging
 import sqlalchemy as sa
 import sqlalchemy.orm as so
 
+from fastapi import UploadFile
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, async_sessionmaker
 from sqlalchemy.exc import IntegrityError
@@ -9,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from src.admin import schemas
 from src.admin import exceptions
 from src.pagination import paginate
-from src.products.types import CategoryId, AttributeId
+from src.products.types import CategoryId, BrandId
 from src.products.models import (
     Brand,
     Category,
@@ -251,7 +252,7 @@ async def deactivate_category(
 
 async def create_attribute(
         session: async_sessionmaker[AsyncSession],
-        payload: schemas.AttributeIn
+        payload: schemas.Attribute
 ) -> None:
     query = sa.insert(Attribute).values(
         {
@@ -262,7 +263,7 @@ async def create_attribute(
         async with session.begin() as conn:
             await conn.execute(query)
     except IntegrityError as ex:
-        if "uq_attributes_name" in str(ex):
+        if "pk_attributes" in str(ex):
             raise exceptions.DuplicateAttributeName
 
 
@@ -272,7 +273,7 @@ async def list_attributes(
         offset: int,
         name__contain: str | None
 ) -> dict:
-    query = sa.select(Attribute)
+    query = sa.select(Attribute.name)
     if name__contain:
         query = query.where(Attribute.name.ilike(f"%{name__contain}%"))
     return await paginate(
@@ -281,38 +282,38 @@ async def list_attributes(
 
 
 async def delete_attribute(
-        attribute_id: AttributeId,
+        attribute_name: str,
         session: async_sessionmaker[AsyncSession],
 ) -> None:
     query = (
         sa.delete(Attribute)
-        .where(Attribute.id==attribute_id)
-        .returning(Attribute.id)
+        .where(Attribute.name==attribute_name)
+        .returning(Attribute.name)
     )
     async with session.begin() as conn:
-        result: AttributeId | None = await conn.scalar(query)
+        result: str | None = await conn.scalar(query)
     if result is None:
         raise exceptions.AttributeNotFound
 
 
 async def update_attribute(
-        attribute_id: AttributeId,
+        attribute_name: str,
         session: async_sessionmaker[AsyncSession],
-        payload: schemas.AttributeIn
+        payload: schemas.Attribute
 ) -> None:
     query = (
         sa.update(Attribute)
-        .where(Attribute.id==attribute_id)
+        .where(Attribute.name==attribute_name)
         .values(
             {
                 "name": payload.name
             }
         )
-        .returning(Attribute.id)
+        .returning(Attribute.name)
     )
     try:
         async with session.begin() as conn:
-            result: AttributeId | None = await conn.scalar(query)
+            result: str | None = await conn.scalar(query)
         if result is None:
             raise exceptions.AttributeNotFound
     except IntegrityError as ex:
@@ -339,19 +340,13 @@ async def assign_category_attribute(
         attribute_name: str,
         category_id: CategoryId,
 ) -> None:
-    attribute_id_query = sa.select(
-        Attribute.id
-    ).where(Attribute.name==attribute_name)
-    async with session.begin() as conn:
-        attribute_id: AttributeId | None = await conn.scalar(attribute_id_query)
-        if attribute_id is None:
-            raise exceptions.AttributeNotFound
-        query = sa.insert(CategoryAttribute).values(
+    query = sa.insert(CategoryAttribute).values(
             {
                 CategoryAttribute.category_id: category_id,
-                CategoryAttribute.attribute_id: attribute_id
+                CategoryAttribute.attribute_name: attribute_name
             }
         )
+    async with session.begin() as conn:
         try:
             await conn.execute(query)
         except IntegrityError as ex:
@@ -359,6 +354,10 @@ async def assign_category_attribute(
                 raise exceptions.CategoryNotFound
             if "pk_categoryattributes" in str(ex):
                 raise exceptions.CategoryAttributeUniqueTogether
+            if "fk_categoryattributes_attribute_name_attributes" in str(ex):
+                raise exceptions.AttributeNotFound
+        except Exception as ex:
+            logger.warning(f"Unexpected error => {ex}")
 
 
 async def unassign_category_attribute(
@@ -366,19 +365,13 @@ async def unassign_category_attribute(
         attribute_name: str,
         category_id: CategoryId,
 ) -> None:
-    attribute_id_query = sa.select(
-        Attribute.id
-    ).where(Attribute.name==attribute_name)
+    query = sa.delete(CategoryAttribute).where(
+        sa.and_(
+            CategoryAttribute.category_id==category_id,
+            CategoryAttribute.attribute_name==attribute_name
+        )
+    ).returning(CategoryAttribute.category_id)
     async with session.begin() as conn:
-        attribute_id: AttributeId | None = await conn.scalar(attribute_id_query)
-        if attribute_id is None:
-            raise exceptions.AttributeNotFound
-        query = sa.delete(CategoryAttribute).where(
-            sa.and_(
-                CategoryAttribute.category_id==category_id,
-                CategoryAttribute.attribute_id==attribute_id
-            )
-        ).returning(CategoryAttribute.category_id)
         result: CategoryId | None = await conn.scalar(query)
         if result is None:
             raise exceptions.UnassignedWentWrong
@@ -391,9 +384,30 @@ async def list_assigned_attributes(
     query = (
         sa.select(Attribute.name)
         .select_from(Attribute)
-        .join(CategoryAttribute, CategoryAttribute.attribute_id==Attribute.id)
+        .join(CategoryAttribute, CategoryAttribute.attribute_name==Attribute.name)
         .where(CategoryAttribute.category_id==category_id)
     )
     async with session.begin() as conn:
         result = (await conn.scalars(query)).all()
     return [attribute_name for attribute_name in result]
+
+# ==================== Products service ==================== #
+
+async def create_product(
+        payload: schemas.ProductIn,
+        images: list[UploadFile],
+        session: async_sessionmaker[AsyncSession],
+):
+    category_query = sa.select(Category.id).where(
+        Category.name==payload.category_name
+    )
+    brand_query = sa.select(Brand.id).where(
+        Brand.name==payload.brand_name
+    )
+    async with session.begin() as conn:
+        category_id: CategoryId | None = await conn.scalar(category_query)
+        brand_id: BrandId | None = await conn.scalar(brand_query)
+        if category_id is None:
+            raise exceptions.CategoryNotFound
+        if brand_id is None:
+            raise exceptions.BrandNotFound
