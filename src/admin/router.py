@@ -384,3 +384,18 @@ async def deactivate_product(
         session=session,
         product_id=product_id
     )
+
+
+@router.delete(
+    "/delete-product/{product_id}/",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_product(
+    product_id: ProductId,
+    is_admin: Annotated[bool, Depends(is_admin)],
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+) -> None:
+    await service.delete_product(
+        session=session,
+        product_id=product_id
+    )

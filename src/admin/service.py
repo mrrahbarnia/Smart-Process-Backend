@@ -21,7 +21,7 @@ from src.products.models import (
     ProductImage,
     AttributeValue
 )
-from src.s3.utils import upload_to_s3
+from src.s3.utils import upload_to_s3, delete_from_s3
 
 logger = logging.getLogger("admin")
 
@@ -495,3 +495,18 @@ async def deactivate_product(
         result: ProductId | None = await conn.scalar(query)
     if result is None:
         raise exceptions.ProductNotFound
+
+
+async def delete_product(
+        session: async_sessionmaker[AsyncSession],
+        product_id: ProductId
+) -> None:
+    image_query = sa.select(ProductImage.url).where(
+        ProductImage.product_id==product_id
+    )
+    query = sa.delete(Product).where(Product.id==product_id)
+    async with session.begin() as conn:
+        result = list((await conn.scalars(image_query)).all())
+        await conn.execute(query)
+    for image_name in result:
+        await delete_from_s3(image_name)
