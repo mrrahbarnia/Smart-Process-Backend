@@ -9,13 +9,13 @@ from pydantic import (
     Field,
     computed_field,
     model_validator,
-    field_validator,
-    ValidationInfo
+    field_validator
 )
 
 from src.utils import slugify
 from src.schemas import CustomBaseModel
 from src.products import types as product_types
+from src.s3.config import storage_config
 
 
 class Brand(BaseModel):
@@ -63,17 +63,20 @@ class AttributeValueIn(BaseModel):
     value: Annotated[str | None, Field(max_length=200)] = None
 
 
-class ProductIn(CustomBaseModel):
+class ProductBase(CustomBaseModel):
     serial_number: Annotated[product_types.SerialNumber, Field(alias="serialNumber")]
     name: Annotated[str, Field(max_length=200)]
-    description: str
     stock: Annotated[int, Field(ge=0)]
     price: Annotated[Decimal, Field(ge=0)]
     discount: Annotated[Decimal | None, Field(ge=0, le=100)] = None
-    expiry_discount: Annotated[date | None, Field(alias="expiryDiscount")] = None
-    attribute_values: Annotated[list[AttributeValueIn], Field(alias="attributeValues")]
     category_name: Annotated[str, Field(alias="categoryName", max_length=150)]
     brand_name: Annotated[str, Field(alias="brandName", max_length=200)]
+
+
+class ProductIn(ProductBase):
+    description: str
+    expiry_discount: Annotated[date | None, Field(alias="expiryDiscount")] = None
+    attribute_values: Annotated[list[AttributeValueIn], Field(alias="attributeValues")]
 
     @model_validator(mode="before")
     @classmethod
@@ -87,3 +90,25 @@ class ProductIn(CustomBaseModel):
         if (self.discount and not self.expiry_discount) or (self.expiry_discount and not self.discount):
             raise ValueError("Discount and expiry_discount must used together!")
         return self
+
+
+class ProductList(ProductBase):
+    image_url: Annotated[str, Field(serialization_alias="imageUrl", alias="imageUrl")]
+
+    @field_validator("image_url", mode="after")
+    @classmethod
+    def set_image_url(cls, image_url: str) -> str:
+        return f"{storage_config.S3_API}/{image_url}"
+
+
+class ProductQuerySearch(CustomBaseModel):
+    category__exact: Annotated[str | None, Field(alias="categoryExact")] = None
+    brand__exact: Annotated[str | None, Field(alias="brandExact")] = None
+    name__contain: Annotated[str | None, Field(alias="nameContain")] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_to_json(cls, value) -> Any:
+        if isinstance(value, str):
+            return cls(**json.loads(value))
+        return value

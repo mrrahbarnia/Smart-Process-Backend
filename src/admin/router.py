@@ -1,6 +1,6 @@
 from typing import Annotated
 from redis.asyncio import Redis
-from fastapi import APIRouter, status, UploadFile, Depends
+from fastapi import APIRouter, status, UploadFile, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, async_sessionmaker
 
 from src.database import get_session, get_redis, get_engine
@@ -399,3 +399,23 @@ async def delete_product(
         session=session,
         product_id=product_id
     )
+
+
+@router.get(
+    "/list-products/",
+    status_code=status.HTTP_200_OK,
+    response_model=PaginatedResponse[schemas.ProductList]
+)
+async def list_products(
+    is_admin: Annotated[bool, Depends(is_admin)],
+    filter_query: Annotated[schemas.ProductQuerySearch, Query()],
+    engine: Annotated[AsyncEngine, Depends(get_engine)],
+    pagination_info: Annotated[PaginationQuerySchema, Depends(pagination_query)]
+) -> dict:
+    result = await service.list_products(
+        filter_query=filter_query,
+        engine=engine,
+        limit=pagination_info.limit,
+        offset=pagination_info.offset
+    )
+    return result

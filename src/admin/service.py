@@ -510,3 +510,41 @@ async def delete_product(
         await conn.execute(query)
     for image_name in result:
         await delete_from_s3(image_name)
+
+
+async def list_products(
+        filter_query: schemas.ProductQuerySearch,
+        engine: AsyncEngine,
+        limit: int,
+        offset: int,
+) -> dict:
+    sub_query = sa.select(
+        ProductImage.url,
+        ProductImage.product_id
+    ).distinct(ProductImage.product_id).subquery()
+    query = (
+        sa.select(
+            Product.id,
+            Product.serial_number,
+            Product.name,
+            Product.stock,
+            Product.price,
+            Product.discount,
+            Category.name.label("category_name"),
+            Brand.name.label("brand_name"),
+            sub_query.c.url.label("image_url")
+        )
+        .select_from(Product)
+        .join(Category, Product.category_id==Category.id)
+        .join(Brand, Product.brand_id==Brand.id)
+        .join(sub_query, Product.id==sub_query.c.product_id)
+    )
+    if filter_query.brand__exact:
+        query = query.where(Brand.name==filter_query.brand__exact)
+    if filter_query.category__exact:
+        query = query.where(Category.name==filter_query.category__exact)
+    if filter_query.name__contain:
+        query = query.where(Product.name.ilike(f"%{filter_query.name__contain}%"))
+    return await paginate(
+        engine=engine, query=query, limit=limit, offset=offset
+    )
