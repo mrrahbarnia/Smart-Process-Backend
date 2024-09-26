@@ -9,14 +9,19 @@ from sqlalchemy.exc import IntegrityError
 
 from src.admin import schemas
 from src.admin import exceptions
+from src.admin.utils import validate_images_and_return_unique_image_names
 from src.pagination import paginate
-from src.products.types import CategoryId, BrandId
+from src.products.types import CategoryId, BrandId, ProductId
 from src.products.models import (
     Brand,
     Category,
     Attribute,
-    CategoryAttribute
+    CategoryAttribute,
+    Product,
+    ProductImage,
+    AttributeValue
 )
+from src.s3.utils import upload_to_s3
 
 logger = logging.getLogger("admin")
 
@@ -397,7 +402,8 @@ async def create_product(
         payload: schemas.ProductIn,
         images: list[UploadFile],
         session: async_sessionmaker[AsyncSession],
-):
+) -> None:
+    image_unique_names = await validate_images_and_return_unique_image_names(images)
     category_query = sa.select(Category.id).where(
         Category.name==payload.category_name
     )
@@ -411,3 +417,81 @@ async def create_product(
             raise exceptions.CategoryNotFound
         if brand_id is None:
             raise exceptions.BrandNotFound
+        product_query = sa.insert(Product).values(
+            {
+                Product.serial_number: payload.serial_number,
+                Product.name: payload.name,
+                Product.description: payload.description,
+                Product.stock: payload.stock,
+                Product.price: payload.price,
+                Product.discount: payload.discount if payload.discount else None,
+                Product.expiry_discount: payload.expiry_discount if payload.expiry_discount else None,
+                Product.brand_id: brand_id,
+                Product.category_id: category_id
+            }
+        ).returning(Product.id)
+        try:
+            product_id: ProductId | None = await conn.scalar(product_query)
+        except IntegrityError as ex:
+            if "uq_products_name" in str(ex):
+                raise exceptions.DuplicateProductName
+            if "uq_products_serial_number" in str(ex):
+                raise exceptions.DuplicateProductSerialNumber
+        image_query = sa.insert(ProductImage).values(
+            [
+                {
+                    ProductImage.url: image_name,
+                    ProductImage.product_id: product_id
+                } for image_name in image_unique_names
+            ]
+        )
+        attribute_query = sa.insert(AttributeValue).values(
+            [
+                {
+                    AttributeValue.value: attribute_value.value,
+                    AttributeValue.attribute_name: attribute_value.attribute,
+                    AttributeValue.product_id: product_id
+                } for attribute_value in payload.attribute_values
+            ]
+        )
+        await conn.execute(image_query)
+        try:
+            await conn.execute(attribute_query)
+        except IntegrityError as ex:
+            if "fk_attributevalues_attribute_name_attributes" in str(ex):
+                raise exceptions.AttributeNotFound
+            if "fk_attributevalues_product_id_products" in str(ex):
+                raise exceptions.ProductNotFound
+
+    for image_unique_name, image_file in image_unique_names.items():
+        await upload_to_s3(file=image_file, unique_filename=image_unique_name)
+
+
+async def activate_product(
+        session: async_sessionmaker[AsyncSession],
+        product_id: ProductId
+) -> None:
+    query = sa.update(Product).where(Product.id==product_id).values(
+        {
+            Product.is_active: True
+        }
+    ).returning(Product.id)
+    async with session.begin() as conn:
+        result: ProductId | None = await conn.scalar(query)
+    if result is None:
+        raise exceptions.ProductNotFound
+
+
+async def deactivate_product(
+        session: async_sessionmaker[AsyncSession],
+        product_id: ProductId
+) -> None:
+    query = sa.update(Product).where(Product.id==product_id).values(
+        {
+            Product.is_active: False
+        }
+    ).returning(Product.id)
+    async with session.begin() as conn:
+        result: ProductId | None = await conn.scalar(query)
+    if result is None:
+        raise exceptions.ProductNotFound

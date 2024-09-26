@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 74d8447a3972
+Revision ID: 6b34c4a4aa73
 Revises: 
-Create Date: 2024-09-25 13:35:59.050257
+Create Date: 2024-09-26 11:05:09.514274
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '74d8447a3972'
+revision: str = '6b34c4a4aa73'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -92,17 +92,20 @@ def upgrade() -> None:
     sa.Column('views', sa.Integer(), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('brand_id', sa.INTEGER(), nullable=True),
+    sa.Column('category_id', sa.INTEGER(), nullable=True),
     sa.CheckConstraint('discount BETWEEN 0 AND 100', name=op.f('ck_products_check_discount_percent')),
     sa.CheckConstraint('price >= 0', name=op.f('ck_products_check_positive_price')),
     sa.CheckConstraint('stock >= 0', name=op.f('ck_products_check_positive_stock')),
     sa.CheckConstraint('views >= 0', name=op.f('ck_products_check_positive_views')),
     sa.ForeignKeyConstraint(['brand_id'], ['brands.id'], name=op.f('fk_products_brand_id_brands'), ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['category_id'], ['categories.id'], name=op.f('fk_products_category_id_categories'), ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_products')),
     sa.UniqueConstraint('name', name=op.f('uq_products_name')),
     sa.UniqueConstraint('serial_number', name=op.f('uq_products_serial_number'))
     )
     op.create_index('idx_active_products', 'products', ['is_active'], unique=False, postgresql_where=sa.text('is_active = TRUE'))
     op.create_index(op.f('ix_products_brand_id'), 'products', ['brand_id'], unique=False)
+    op.create_index(op.f('ix_products_category_id'), 'products', ['category_id'], unique=False)
     op.create_table('sales',
     sa.Column('id', sa.INTEGER(), autoincrement=True, nullable=False),
     sa.Column('total_quantity', sa.Integer(), nullable=False),
@@ -180,6 +183,7 @@ def downgrade() -> None:
     op.drop_table('attributevalues')
     op.drop_index(op.f('ix_sales_user_id'), table_name='sales')
     op.drop_table('sales')
+    op.drop_index(op.f('ix_products_category_id'), table_name='products')
     op.drop_index(op.f('ix_products_brand_id'), table_name='products')
     op.drop_index('idx_active_products', table_name='products', postgresql_where=sa.text('is_active = TRUE'))
     op.drop_table('products')

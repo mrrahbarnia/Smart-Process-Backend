@@ -77,6 +77,9 @@ class Product(Base):
     brand_id: so.Mapped[types.BrandId | None] = so.mapped_column(sa.ForeignKey(
         f"{Brand.__tablename__}.id", ondelete="SET NULL"
     ), index=True)
+    category_id: so.Mapped[types.CategoryId | None] = so.mapped_column(sa.ForeignKey(
+        f"{Category.__tablename__}.id", ondelete="SET NULL"
+    ), index=True)
 
     def __repr__(self) -> str:
         return f"{self.id} {self.name}"

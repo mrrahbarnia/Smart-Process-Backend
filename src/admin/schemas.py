@@ -1,9 +1,17 @@
 import json
 
-from typing import Annotated, Any
-from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
+from typing import Annotated, Self, Any
 from decimal import Decimal
 from datetime import date
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    computed_field,
+    model_validator,
+    field_validator,
+    ValidationInfo
+)
 
 from src.utils import slugify
 from src.schemas import CustomBaseModel
@@ -56,7 +64,7 @@ class AttributeValueIn(BaseModel):
 
 
 class ProductIn(CustomBaseModel):
-    serial_number: product_types.SerialNumber
+    serial_number: Annotated[product_types.SerialNumber, Field(alias="serialNumber")]
     name: Annotated[str, Field(max_length=200)]
     description: str
     stock: Annotated[int, Field(ge=0)]
@@ -73,3 +81,9 @@ class ProductIn(CustomBaseModel):
         if isinstance(value, str):
             return cls(**json.loads(value))
         return value
+
+    @model_validator(mode="after")
+    def validate_discount(self) -> Self:
+        if (self.discount and not self.expiry_discount) or (self.expiry_discount and not self.discount):
+            raise ValueError("Discount and expiry_discount must used together!")
+        return self

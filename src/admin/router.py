@@ -7,7 +7,7 @@ from src.database import get_session, get_redis, get_engine
 from src.pagination import PaginatedResponse, pagination_query, PaginationQuerySchema
 from src.admin import schemas
 from src.admin import service
-from src.products.types import CategoryId
+from src.products.types import CategoryId, ProductId
 from src.auth.dependencies import is_admin
 
 router = APIRouter()
@@ -345,7 +345,7 @@ async def list_assigned_attributes(
 async def create_product(
     payload: schemas.ProductIn,
     images: list[UploadFile],
-    # is_admin: Annotated[bool, Depends(is_admin)],
+    is_admin: Annotated[bool, Depends(is_admin)],
     session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
 ):
     await service.create_product(
@@ -354,3 +354,33 @@ async def create_product(
         images=images
     )
     return {"detail": "Created successfully."}
+
+
+@router.put(
+    "/activate-product/{product_id}/",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def activate_product(
+    product_id: ProductId,
+    is_admin: Annotated[bool, Depends(is_admin)],
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+) -> None:
+    await service.activate_product(
+        session=session,
+        product_id=product_id
+    )
+
+
+@router.put(
+    "/deactivate-product/{product_id}/",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def deactivate_product(
+    product_id: ProductId,
+    is_admin: Annotated[bool, Depends(is_admin)],
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+) -> None:
+    await service.deactivate_product(
+        session=session,
+        product_id=product_id
+    )
