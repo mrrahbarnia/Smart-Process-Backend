@@ -38,7 +38,10 @@ async def register(
         verification_code=verification_code,
     ):
         worker.add_task(service.send_message, payload.phone_number, verification_code)
-    return schemas.RegisterOut(phone_number=payload.phone_number)
+    return schemas.RegisterOut(
+        phone_number=payload.phone_number,
+        username=payload.username
+    )
 
 
 @router.post(

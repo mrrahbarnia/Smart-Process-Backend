@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 6b34c4a4aa73
+Revision ID: 29a306cf619d
 Revises: 
-Create Date: 2024-09-26 11:05:09.514274
+Create Date: 2024-09-27 19:02:05.970649
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '6b34c4a4aa73'
+revision: str = '29a306cf619d'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -51,13 +51,15 @@ def upgrade() -> None:
     op.create_table('users',
     sa.Column('id', sa.INTEGER(), autoincrement=True, nullable=False),
     sa.Column('phone_number', sa.String(length=12), nullable=False),
+    sa.Column('username', sa.String(length=250), nullable=False),
     sa.Column('password', sa.String(length=128), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('rule', sa.Enum('USER', 'ADMIN', name='userrule'), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.CheckConstraint('CHAR_LENGTH(phone_number) = 11', name=op.f('ck_users_check_phone_length')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_users')),
-    sa.UniqueConstraint('phone_number', name=op.f('uq_users_phone_number'))
+    sa.UniqueConstraint('phone_number', name=op.f('uq_users_phone_number')),
+    sa.UniqueConstraint('username', name=op.f('uq_users_username'))
     )
     op.create_table('carts',
     sa.Column('id', sa.INTEGER(), autoincrement=True, nullable=False),

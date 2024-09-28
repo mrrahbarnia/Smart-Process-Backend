@@ -2,7 +2,7 @@ import json
 
 from typing import Annotated, Self, Any
 from decimal import Decimal
-from datetime import date
+from datetime import date, datetime
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -93,12 +93,29 @@ class ProductIn(ProductBase):
 
 
 class ProductList(ProductBase):
+    id: product_types.ProductId
     image_url: Annotated[str, Field(serialization_alias="imageUrl", alias="imageUrl")]
 
     @field_validator("image_url", mode="after")
     @classmethod
     def set_image_url(cls, image_url: str) -> str:
         return f"{storage_config.S3_API}/{image_url}"
+
+
+class ProductDetail(ProductBase):
+    is_active: Annotated[bool, Field(alias="isActive")]
+    description: str
+    expiry_discount: Annotated[date | None, Field(alias="expiryDiscount")] = None
+    attribute_values: Annotated[dict | None, Field(alias="attributeValues")] = None
+    image_urls: Annotated[list[str], Field(serialization_alias="imageUrls")]
+
+    @field_validator("image_urls", mode="after")
+    @classmethod
+    def set_image_url(cls, image_urls: list[str]) -> list[str]:
+        image_s3_urls = list()
+        for image in image_urls:
+            image_s3_urls.append(f"{storage_config.S3_API}/{image}")
+        return image_s3_urls
 
 
 class ProductQuerySearch(CustomBaseModel):

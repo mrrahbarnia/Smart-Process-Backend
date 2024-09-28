@@ -15,6 +15,7 @@ class User(Base):
 
     id: so.Mapped[UserId] = so.mapped_column(primary_key=True, autoincrement=True)
     phone_number: so.Mapped[PhoneNumber] = so.mapped_column(sa.String(12), unique=True)
+    username: so.Mapped[str] = so.mapped_column(sa.String(250), unique=True)
     password: so.Mapped[Password] = so.mapped_column(sa.String(128)) # 128 for storing hash passwords
     created_at: so.Mapped[datetime] = so.mapped_column(
         sa.TIMESTAMP(timezone=True), server_default=sa.func.now()

@@ -7,7 +7,7 @@ from src.database import get_session, get_redis, get_engine
 from src.pagination import PaginatedResponse, pagination_query, PaginationQuerySchema
 from src.admin import schemas
 from src.admin import service
-from src.products.types import CategoryId, ProductId
+from src.products.types import CategoryId, ProductId, CommentId
 from src.auth.dependencies import is_admin
 
 router = APIRouter()
@@ -419,3 +419,36 @@ async def list_products(
         offset=pagination_info.offset
     )
     return result
+
+
+@router.get(
+    "/product-detail/{product_id}/",
+    status_code=status.HTTP_200_OK,
+    response_model=schemas.ProductDetail
+)
+async def product_detail(
+    product_id: ProductId,
+    is_admin: Annotated[bool, Depends(is_admin)],
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+):
+    result = await service.product_detail(
+        session=session,
+        product_id=product_id
+    )
+    return result
+
+# ==================== Comments routes ==================== #
+
+@router.delete(
+    "/delete-my-comment/{comment_id}/",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_my_comment(
+    comment_id: CommentId,
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+    is_admin: Annotated[bool, Depends(is_admin)],
+) -> None:
+    await service.delete_comment(
+        session=session,
+        comment_id=comment_id
+    )

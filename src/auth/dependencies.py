@@ -29,7 +29,7 @@ async def decode_access_token(token: Annotated[str, Depends(oauth2_schema)]) -> 
 async def get_current_active_user(
         data: Annotated[dict, Depends(decode_access_token)],
         session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)]
-):
+) -> User:
     if "user_id" not in data:
         raise exceptions.CredentialsException
     user_id: UserId | None = data.get("user_id")

@@ -11,7 +11,7 @@ from src.admin import schemas
 from src.admin import exceptions
 from src.admin.utils import validate_images_and_return_unique_image_names
 from src.pagination import paginate
-from src.products.types import CategoryId, BrandId, ProductId
+from src.products.types import CategoryId, BrandId, ProductId, CommentId
 from src.products.models import (
     Brand,
     Category,
@@ -19,9 +19,11 @@ from src.products.models import (
     CategoryAttribute,
     Product,
     ProductImage,
-    AttributeValue
+    AttributeValue,
+    Comment
 )
 from src.s3.utils import upload_to_s3, delete_from_s3
+from src.auth.models import User
 
 logger = logging.getLogger("admin")
 
@@ -538,7 +540,7 @@ async def list_products(
         .join(Category, Product.category_id==Category.id)
         .join(Brand, Product.brand_id==Brand.id)
         .join(sub_query, Product.id==sub_query.c.product_id)
-    )
+    ).order_by(Product.created_at.desc())
     if filter_query.brand__exact:
         query = query.where(Brand.name==filter_query.brand__exact)
     if filter_query.category__exact:
@@ -548,3 +550,67 @@ async def list_products(
     return await paginate(
         engine=engine, query=query, limit=limit, offset=offset
     )
+
+
+async def product_detail(
+        session: async_sessionmaker[AsyncSession],
+        product_id: ProductId,
+):
+    query = (
+        sa.select(
+            Product.id,
+            Product.serial_number,
+            Product.name,
+            Product.stock,
+            Product.price,
+            Product.discount,
+            Product.is_active,
+            Product.description,
+            Product.expiry_discount,
+            Category.name.label("category_name"),
+            Brand.name.label("brand_name"),
+            AttributeValue.attribute_name.label("attribute"),
+            AttributeValue.value,
+            ProductImage.url.label("image_urls")
+        )
+        .select_from(Product)
+        .join(Category, Product.category_id==Category.id)
+        .join(Brand, Product.brand_id==Brand.id)
+        .join(ProductImage, Product.id==ProductImage.product_id, isouter=True)
+        .join(AttributeValue, Product.id==AttributeValue.product_id, isouter=True)
+        .where(Product.id==product_id)
+    )
+    async with session.begin() as conn:
+        result = (await conn.execute(query)).all()
+
+    if len(result) == 0:
+        raise exceptions.ProductNotFound
+    attribute_values = dict()
+    for p in result:
+        if p.attribute not in attribute_values:
+            attribute_values[p.attribute] = p.value
+    return {
+        "id": result[0].id,
+        "serial_number": result[0].serial_number,
+        "is_active": result[0].is_active,
+        "name": result[0].name,
+        "stock": result[0].stock,
+        "price": result[0].price,
+        "discount": result[0].discount,
+        "description": result[0].description,
+        "expiry_discount": result[0].expiry_discount,
+        "category_name": result[0].category_name,
+        "brand_name": result[0].brand_name,
+        "image_urls": set([p.image_urls for p in result]),
+        "attribute_values": attribute_values
+    }
+
+# ==================== Comment service ==================== #
+
+async def delete_comment(
+        comment_id: CommentId,
+        session: async_sessionmaker[AsyncSession],
+) -> None:
+    query = sa.delete(Comment).where(Comment.id==comment_id)
+    async with session.begin() as conn:
+        await conn.execute(query)

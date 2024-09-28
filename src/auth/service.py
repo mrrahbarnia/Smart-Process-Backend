@@ -45,6 +45,7 @@ async def register(
     query = sa.insert(User).values(
         {
             User.phone_number: payload.phone_number,
+            User.username: payload.username,
             User.password: hashed_password,
         }
     )
@@ -56,8 +57,11 @@ async def register(
             value=payload.phone_number,
             ex=auth_config.VERIFICATION_CODE_LIFE_TIME_SECONDS
         )
-    except IntegrityError:
-        raise exceptions.PhoneNumberAlreadyExists
+    except IntegrityError as ex:
+        if "uq_users_username" in str(ex):
+            raise exceptions.UsernameAlreadyExists
+        if "uq_users_phone_number" in str(ex):
+            raise exceptions.PhoneNumberAlreadyExists
     return True
 
 

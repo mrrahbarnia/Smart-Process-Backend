@@ -14,6 +14,7 @@ PASSWORD_PATTERN = auth_config.PASSWORD_PATTERN
 
 class RegisterOut(CustomBaseModel):
     phone_number: Annotated[PhoneNumber, Field(alias="phoneNumber")]
+    username: Annotated[str, Field(max_length=250)]
 
 
 class RegisterIn(RegisterOut):
@@ -21,6 +22,7 @@ class RegisterIn(RegisterOut):
         "examples": [
             {
                 "phoneNumber": "09131111111",
+                "username": "Mohammad",
                 "password": "12345678",
                 "confirmPassword": "12345678",
             }
