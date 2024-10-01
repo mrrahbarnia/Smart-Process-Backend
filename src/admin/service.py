@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 
 from src.admin import schemas
 from src.admin import exceptions
+from src.admin.types import ProductDetailResponse
 from src.admin.utils import validate_images_and_return_unique_image_names
 from src.pagination import paginate
 from src.products.types import CategoryId, BrandId, ProductId, CommentId
@@ -528,6 +529,7 @@ async def list_products(
         sa.select(
             Product.id,
             Product.serial_number,
+            Product.category_id,
             Product.name,
             Product.stock,
             Product.price,
@@ -540,13 +542,44 @@ async def list_products(
         .join(Category, Product.category_id==Category.id)
         .join(Brand, Product.brand_id==Brand.id)
         .join(sub_query, Product.id==sub_query.c.product_id)
-    ).order_by(Product.created_at.desc())
+    )
+
     if filter_query.brand__exact:
-        query = query.where(Brand.name==filter_query.brand__exact)
+        query = query.where(
+            Brand.name==filter_query.brand__exact
+        )
+
     if filter_query.category__exact:
-        query = query.where(Category.name==filter_query.category__exact)
+        categories_cte = sa.select(
+            Category.id,
+            Category.name,
+            Category.parent_id,
+            sa.literal(0).label("level")
+        ).where(Category.name==filter_query.category__exact).cte(recursive=True)
+
+        category_alias = sa.alias(Category) # type: ignore
+
+        recursive_query = sa.select(
+            category_alias.c.id,
+            category_alias.c.name,
+            category_alias.c.parent_id,
+            (categories_cte.c.level + 1).label("level")
+        ).join(categories_cte, categories_cte.c.id==category_alias.c.parent_id)
+
+        categories_cte = categories_cte.union(recursive_query)
+        query = query.join(
+            categories_cte, Product.category_id==categories_cte.c.id
+        ).order_by(
+            categories_cte.c.level
+        )
+
     if filter_query.name__contain:
-        query = query.where(Product.name.ilike(f"%{filter_query.name__contain}%"))
+        query = query.where(
+            Product.name.ilike(f"%{filter_query.name__contain}%")
+        )
+
+    query = query.order_by(Product.created_at.desc())
+
     return await paginate(
         engine=engine, query=query, limit=limit, offset=offset
     )
@@ -555,7 +588,7 @@ async def list_products(
 async def product_detail(
         session: async_sessionmaker[AsyncSession],
         product_id: ProductId,
-):
+) -> ProductDetailResponse:
     query = (
         sa.select(
             Product.id,

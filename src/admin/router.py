@@ -440,10 +440,10 @@ async def product_detail(
 # ==================== Comments routes ==================== #
 
 @router.delete(
-    "/delete-my-comment/{comment_id}/",
+    "/delete-comment/{comment_id}/",
     status_code=status.HTTP_204_NO_CONTENT
 )
-async def delete_my_comment(
+async def delete_comment(
     comment_id: CommentId,
     session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
     is_admin: Annotated[bool, Depends(is_admin)],

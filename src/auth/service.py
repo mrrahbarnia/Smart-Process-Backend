@@ -13,6 +13,7 @@ from src.auth import utils
 from src.auth.config import auth_config
 from src.auth.types import Password, UserId, PhoneNumber
 from src.auth.models import User
+from src.cart.service import create_cart
 
 logger = logging.getLogger("auth")
 
@@ -98,9 +99,12 @@ async def verify_account(
         {
             User.is_active: True
         }
-    )
+    ).returning(User.id)
     async with session.begin() as conn:
-        await conn.execute(query)
+        user_id: UserId | None = await conn.scalar(query)
+        if user_id:
+            await create_cart(user_id=user_id, conn=conn)
+
 
 
 async def change_password(
