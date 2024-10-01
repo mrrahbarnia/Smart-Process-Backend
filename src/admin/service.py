@@ -534,6 +534,7 @@ async def list_products(
             Product.stock,
             Product.price,
             Product.discount,
+            Product.is_active,
             Category.name.label("category_name"),
             Brand.name.label("brand_name"),
             sub_query.c.url.label("image_url")

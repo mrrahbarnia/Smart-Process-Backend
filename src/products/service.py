@@ -8,11 +8,14 @@ from redis.asyncio import Redis
 from src.pagination import paginate
 from src.products import exceptions
 from src.products import schemas
-from src.products.models import Brand, Category, Comment
+from src.products.models import Brand, Category, Comment, Product, ProductImage, AttributeValue
 from src.products.types import ProductId, CommentId, CommentListResponse
 from src.products.config import products_config
 from src.auth.models import User
 from src.auth.types import UserId
+from src.admin.schemas import ProductQuerySearch
+from src.admin.types import ProductDetailResponse
+from src.admin.exceptions import ProductNotFound
 
 # ==================== Brand services ==================== #
 
@@ -165,3 +168,153 @@ async def delete_my_comment(
         result: CommentId | None = await conn.scalar(query)
     if result is None:
         raise exceptions.CommentNotOwner
+
+# ==================== Product services ==================== #
+
+async def list_products(
+        engine: AsyncEngine,
+        filter_query: ProductQuerySearch,
+        limit: int,
+        offset: int
+) -> dict:
+    sub_query = sa.select(
+        ProductImage.url,
+        ProductImage.product_id
+    ).distinct(ProductImage.product_id).subquery()
+    query = (
+        sa.select(
+            Product.id,
+            Product.serial_number,
+            Product.category_id,
+            Product.name,
+            Product.stock,
+            Product.price,
+            Product.discount,
+            Product.is_active,
+            Category.name.label("category_name"),
+            Brand.name.label("brand_name"),
+            sub_query.c.url.label("image_url")
+        )
+        .select_from(Product)
+        .join(Category, Product.category_id==Category.id)
+        .join(Brand, Product.brand_id==Brand.id)
+        .join(sub_query, Product.id==sub_query.c.product_id)
+    )
+
+    if filter_query.brand__exact:
+        query = query.where(
+            sa.and_(
+                Brand.name==filter_query.brand__exact,
+                Brand.is_active.is_(True)
+            )
+        )
+
+    if filter_query.category__exact:
+        categories_cte = sa.select(
+            Category.id,
+            Category.name,
+            Category.is_active,
+            Category.parent_id,
+            sa.literal(0).label("level")
+        ).where(
+            sa.and_(
+                Category.name==filter_query.category__exact,
+                Category.is_active.is_(True)
+            )
+        ).cte(recursive=True)
+
+        category_alias = sa.alias(Category) # type: ignore
+
+        recursive_query = sa.select(
+            category_alias.c.id,
+            category_alias.c.name,
+            category_alias.c.is_active,
+            category_alias.c.parent_id,
+            (categories_cte.c.level + 1).label("level")
+        ).join(
+            categories_cte, categories_cte.c.id==category_alias.c.parent_id
+        )
+
+        categories_cte = categories_cte.union(recursive_query)
+        query = query.join(
+            categories_cte, Product.category_id==categories_cte.c.id
+        ).where(categories_cte.c.is_active.is_(True)).order_by(
+            categories_cte.c.level
+        )
+        
+
+    if filter_query.name__contain:
+        query = query.where(
+            Product.name.ilike(f"%{filter_query.name__contain}%")
+        )
+
+    query = query.where(
+        Product.is_active.is_(True),
+        Brand.is_active.is_(True),
+        Category.is_active.is_(True)
+    ).order_by(Product.created_at.desc())
+
+    return await paginate(
+        engine=engine, query=query, limit=limit, offset=offset
+    )
+
+
+async def product_detail(
+        session: async_sessionmaker[AsyncSession],
+        product_id: ProductId,
+) -> ProductDetailResponse:
+    query = (
+        sa.select(
+            Product.id,
+            Product.serial_number,
+            Product.name,
+            Product.stock,
+            Product.price,
+            Product.discount,
+            Product.is_active,
+            Product.description,
+            Product.expiry_discount,
+            Category.name.label("category_name"),
+            Brand.name.label("brand_name"),
+            AttributeValue.attribute_name.label("attribute"),
+            AttributeValue.value,
+            ProductImage.url.label("image_urls")
+        )
+        .select_from(Product)
+        .join(Category, Product.category_id==Category.id)
+        .join(Brand, Product.brand_id==Brand.id)
+        .join(ProductImage, Product.id==ProductImage.product_id, isouter=True)
+        .join(AttributeValue, Product.id==AttributeValue.product_id, isouter=True)
+        .where(
+            sa.and_(
+                Product.id==product_id,
+                Product.is_active.is_(True),
+                Brand.is_active.is_(True),
+                Category.is_active.is_(True)
+            )
+        )
+    )
+    async with session.begin() as conn:
+        result = (await conn.execute(query)).all()
+
+    if len(result) == 0:
+        raise ProductNotFound
+    attribute_values = dict()
+    for p in result:
+        if p.attribute not in attribute_values:
+            attribute_values[p.attribute] = p.value
+    return {
+        "id": result[0].id,
+        "serial_number": result[0].serial_number,
+        "is_active": result[0].is_active,
+        "name": result[0].name,
+        "stock": result[0].stock,
+        "price": result[0].price,
+        "discount": result[0].discount,
+        "description": result[0].description,
+        "expiry_discount": result[0].expiry_discount,
+        "category_name": result[0].category_name,
+        "brand_name": result[0].brand_name,
+        "image_urls": set([p.image_urls for p in result]),
+        "attribute_values": attribute_values
+    }

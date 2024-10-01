@@ -95,6 +95,7 @@ class ProductIn(ProductBase):
 class ProductList(ProductBase):
     id: product_types.ProductId
     image_url: Annotated[str, Field(serialization_alias="imageUrl", alias="imageUrl")]
+    is_active: Annotated[bool, Field(alias="isActive")]
 
     @field_validator("image_url", mode="after")
     @classmethod

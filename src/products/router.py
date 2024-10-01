@@ -1,15 +1,17 @@
 from typing import Annotated
 from redis.asyncio import Redis
-from fastapi import APIRouter, status, Depends
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from fastapi import APIRouter, status, Depends, Query
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, AsyncEngine
 
-from src.database import get_redis, get_session
+from src.database import get_redis, get_session, get_engine
+from src.pagination import PaginatedResponse, PaginationQuerySchema, pagination_query
 from src.products import service
 from src.products import schemas
 from src.products.types import ProductId, CommentId, CommentListResponse
 from src.admin.schemas import Brand
 from src.auth.models import User
 from src.auth.dependencies import get_current_active_user
+from src.admin.schemas import ProductQuerySearch, ProductList, ProductDetail
 
 router = APIRouter()
 
@@ -113,3 +115,39 @@ async def delete_my_comment(
         comment_id=comment_id,
         user_id=user.id
     )
+
+# ==================== Products routes ==================== #
+
+@router.get(
+    "/list-products/",
+    status_code=status.HTTP_200_OK,
+    response_model=PaginatedResponse[ProductList]
+)
+async def list_products(
+    filter_query: Annotated[ProductQuerySearch, Query()],
+    engine: Annotated[AsyncEngine, Depends(get_engine)],
+    pagination_info: Annotated[PaginationQuerySchema, Depends(pagination_query)]
+) -> dict:
+    result = await service.list_products(
+        filter_query=filter_query,
+        engine=engine,
+        limit=pagination_info.limit,
+        offset=pagination_info.offset
+    )
+    return result
+
+
+@router.get(
+    "/product-detail/{product_id}/",
+    status_code=status.HTTP_200_OK,
+    response_model=ProductDetail
+)
+async def product_detail(
+    product_id: ProductId,
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+):
+    result = await service.product_detail(
+        session=session,
+        product_id=product_id
+    )
+    return result
