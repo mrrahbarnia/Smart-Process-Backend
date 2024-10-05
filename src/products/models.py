@@ -61,7 +61,7 @@ class Product(Base):
     )
 
     id: so.Mapped[types.ProductId] = so.mapped_column(primary_key=True, default=uuid4, init=False)
-    serial_number: so.Mapped[types.SerialNumber] = so.mapped_column(sa.String(30), unique=True)
+    serial_number: so.Mapped[types.SerialNumber] = so.mapped_column(sa.String(150), unique=True)
     name: so.Mapped[str] = so.mapped_column(sa.String(200), unique=True)
     description: so.Mapped[str] = so.mapped_column(sa.Text)
     stock: so.Mapped[int]

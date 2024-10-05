@@ -9,9 +9,11 @@ from src.products import service
 from src.products import schemas
 from src.products.types import ProductId, CommentId, CommentListResponse
 from src.admin.schemas import Brand
+from src.admin.types import GuarantySerial
 from src.auth.models import User
 from src.auth.dependencies import get_current_active_user
 from src.admin.schemas import ProductQuerySearch, ProductList, ProductDetail
+from src.admin.types import ProductDetailResponse
 
 router = APIRouter()
 
@@ -145,9 +147,26 @@ async def list_products(
 async def product_detail(
     product_id: ProductId,
     session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
-):
+) -> ProductDetailResponse:
     result = await service.product_detail(
         session=session,
         product_id=product_id
+    )
+    return result
+
+# ==================== Guaranty routes ==================== #
+
+@router.get(
+    "/inquiry-guaranty/{serial_number}/",
+    status_code=status.HTTP_200_OK,
+    response_model=schemas.InquiryGuarantyOut
+)
+async def inquiry_guaranty(
+    serial_number: GuarantySerial,
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+):
+    result = await service.inquiry_guaranty(
+        serial_number=serial_number,
+        session=session
     )
     return result

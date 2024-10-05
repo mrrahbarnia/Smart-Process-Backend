@@ -10,6 +10,7 @@ from src.auth import models as auth_models # noqa
 from src.products import models as products_models # noqa
 from src.cart import models as cart_models # noqa
 from src.sales import models as sales_models # noqa
+from src.admin import models as admin_models # noqa
 
 from alembic import context
 

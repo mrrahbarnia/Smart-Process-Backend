@@ -452,3 +452,21 @@ async def delete_comment(
         session=session,
         comment_id=comment_id
     )
+
+# ==================== Guaranty routes ==================== #
+
+@router.post(
+    "/add-guaranties/",
+    status_code=status.HTTP_201_CREATED
+)
+async def add_guaranties(
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
+    is_admin: Annotated[bool, Depends(is_admin)],
+    file: UploadFile,
+) -> dict:
+    await service.add_guaranties(
+        redis=redis,
+        file=file
+    )
+    return {"detail": "Created successfully."}

@@ -1,0 +1,68 @@
+version: '3.9'
+
+services:
+
+  app:
+    build: 
+      context: .
+      dockerfile: ./Dockerfile.dev
+    container_name: app
+    command: >
+      sh -c "
+            uvicorn src.main:app --host=0.0.0.0 --reload
+            alembic revision --autogenerate -m "init"
+            alembic upgrade head
+          "
+    ports:
+      - '8000:8000'
+    env_file:
+      - ./.env
+    volumes:
+      - ./src:/src/
+      - ./alembic:/alembic/
+    depends_on:
+      - dev-db
+      - redis
+    restart: always
+
+  redis_listener:
+    build:
+      context: .
+      dockerfile: ./Dockerfile.dev
+    container_name: redis_listener
+    command: python ./src/consumer.py
+    environment:
+      - PYTHONPATH=.
+    env_file:
+      - ./.env
+    volumes:
+      - ./src:/src/
+    depends_on:
+      - redis
+      - dev-db
+      - app
+    restart: always
+
+  prod-db:
+    image: postgres:16.1-alpine3.19
+    restart: always
+    env_file:
+      - ./.env
+    ports:
+      - "5432:5432"
+    volumes:
+      - proddb-volume:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis
+    command: redis-server --notify-keyspace-events Kx
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-volume:/data
+
+name: smart-process
+volumes:
+  proddb-volume:
+  redis-volume:

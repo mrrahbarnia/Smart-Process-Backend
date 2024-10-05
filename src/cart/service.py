@@ -1,13 +1,14 @@
 import json
 import sqlalchemy as sa
 
+from decimal import Decimal
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.cart.models import Cart, CartProduct
 from src.cart.config import cart_config
 from src.cart.schemas import AddProductToCartIn
-from src.cart.types import CartPayloadKeyType, CartId
+from src.cart.types import CartPayloadKeyType, MessageJsonType, CartId
 from src.auth.types import UserId
 
 
@@ -64,4 +65,20 @@ async def update_cart(
                 CartProduct.product_id: payload.product_id
             }
         )
+        await conn.execute(query)
+
+
+async def insert_updated_cart_to_db(
+        json_message: MessageJsonType,
+        session: async_sessionmaker[AsyncSession]
+) -> None:
+    query = sa.update(Cart).where(
+            Cart.user_id==int(json_message["user_id"])
+    ).values(
+        {
+            Cart.total_quantity: json_message["total_quantity"],
+            Cart.total_price: Decimal(json_message["total_price"])
+        }
+    )
+    async with session.begin() as conn:
         await conn.execute(query)

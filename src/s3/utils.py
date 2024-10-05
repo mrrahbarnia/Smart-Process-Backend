@@ -27,5 +27,23 @@ async def delete_from_s3(filename: str):
         aws_secret_access_key=storage_config.STORAGE_SECRET_KEY,
     ) as client:
         await client.delete_object(
-            Bucket=storage_config.BUCKET_NAME, Key=filename
+            Bucket=storage_config.BUCKET_NAME,
+            Key=filename
         )
+
+
+async def get_obj_from_s3(filename: str) -> BinaryIO:
+    session = get_session()
+    async with session.create_client(
+        "s3",
+        endpoint_url=storage_config.S3_ENDPOINT,
+        aws_access_key_id=storage_config.STORAGE_ACCESS_KEY,
+        aws_secret_access_key=storage_config.STORAGE_SECRET_KEY,
+    ) as client:
+        response = await client.get_object(
+            Bucket=storage_config.BUCKET_NAME,
+            Key=filename
+        )
+        async with response['Body'] as stream:
+            file_content = await stream.read()
+            return file_content

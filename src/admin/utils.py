@@ -8,6 +8,13 @@ from src.admin import exceptions
 from src.admin.config import admin_config
 
 
+async def create_unique_excel_name(file: UploadFile) -> str:
+    assert file.filename is not None
+    file_ext = os.path.splitext(file.filename)[1]
+    file_unique_name = f"{uuid4()}{file_ext}"
+    return file_unique_name
+
+
 async def validate_images_and_return_unique_image_names(images: list[UploadFile]) -> dict[str, BinaryIO]:
     if len(images) > admin_config.MAXIMUM_IMAGES:
         raise exceptions.MaximumImageNumberExc

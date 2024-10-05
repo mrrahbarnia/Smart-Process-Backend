@@ -1,4 +1,4 @@
-from typing import NewType, TypedDict, Literal
+from typing import NewType, TypedDict
 
 # ==================== Models types ==================== #
 
@@ -12,4 +12,10 @@ class CartPayloadKeyType(TypedDict):
     total_price: str
 
 
-# class CacheCartChangeData(TypedDict):
+class MessageJsonType(TypedDict):
+    """
+    Type which comes from message broker.
+    """
+    user_id: str
+    total_quantity: str
+    total_price: str

@@ -96,3 +96,9 @@ class DuplicateProductSerialNumber(HTTPException):
     def __init__(self) -> None:
         self.status_code = status.HTTP_409_CONFLICT
         self.detail = "Unique serial number for products!"
+
+
+class DuplicateGuarantySerial(HTTPException):
+    def __init__(self) -> None:
+        self.status_code = status.HTTP_409_CONFLICT
+        self.detail = "Unique guaranty serial!"

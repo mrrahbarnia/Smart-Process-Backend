@@ -2,7 +2,7 @@ import json
 
 from typing import Annotated, Self, Any
 from decimal import Decimal
-from datetime import date, datetime
+from datetime import date
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -14,6 +14,7 @@ from pydantic import (
 
 from src.utils import slugify
 from src.schemas import CustomBaseModel
+from src.admin.types import GuarantySerial
 from src.products import types as product_types
 from src.s3.config import storage_config
 

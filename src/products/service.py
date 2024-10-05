@@ -13,8 +13,9 @@ from src.products.types import ProductId, CommentId, CommentListResponse
 from src.products.config import products_config
 from src.auth.models import User
 from src.auth.types import UserId
+from src.admin.models import Guaranty
 from src.admin.schemas import ProductQuerySearch
-from src.admin.types import ProductDetailResponse
+from src.admin.types import ProductDetailResponse, GuarantySerial
 from src.admin.exceptions import ProductNotFound
 
 # ==================== Brand services ==================== #
@@ -318,3 +319,23 @@ async def product_detail(
         "image_urls": set([p.image_urls for p in result]),
         "attribute_values": attribute_values
     }
+
+# ==================== Guaranty service ==================== #
+
+async def inquiry_guaranty(
+        session: async_sessionmaker[AsyncSession],
+        serial_number: GuarantySerial,
+):
+    query = sa.select(
+        Guaranty.product_serial_number,
+        Guaranty.guaranty_serial,
+        Guaranty.product_name,
+        Guaranty.date_of_document
+    ).where(
+        Guaranty.guaranty_serial==serial_number
+    )
+    async with session.begin() as conn:
+        guaranty = (await conn.execute(query)).first()
+    if guaranty is None:
+        raise exceptions.GuarantyNotFound
+    return guaranty

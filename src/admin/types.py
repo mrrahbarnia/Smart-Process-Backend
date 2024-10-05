@@ -1,9 +1,11 @@
-from typing import TypedDict
+from typing import TypedDict, NewType
 from decimal import Decimal
 from datetime import datetime
 
 from src.products.types import ProductId, SerialNumber
 
+GuarantyId = NewType("GuarantyId", int)
+GuarantySerial = NewType("GuarantySerial", str)
 
 class ProductDetailResponse(TypedDict):
     id: ProductId

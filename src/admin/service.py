@@ -2,6 +2,8 @@ import logging
 import sqlalchemy as sa
 import sqlalchemy.orm as so
 
+from io import BytesIO
+from openpyxl import load_workbook # type: ignore
 from fastapi import UploadFile
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, async_sessionmaker
@@ -9,8 +11,12 @@ from sqlalchemy.exc import IntegrityError
 
 from src.admin import schemas
 from src.admin import exceptions
+from src.admin.models import Guaranty
 from src.admin.types import ProductDetailResponse
-from src.admin.utils import validate_images_and_return_unique_image_names
+from src.admin.utils import (
+    validate_images_and_return_unique_image_names,
+    create_unique_excel_name
+)
 from src.pagination import paginate
 from src.products.types import CategoryId, BrandId, ProductId, CommentId
 from src.products.models import (
@@ -648,3 +654,49 @@ async def delete_comment(
     query = sa.delete(Comment).where(Comment.id==comment_id)
     async with session.begin() as conn:
         await conn.execute(query)
+
+# ==================== Guaranty service ==================== #
+
+async def add_guaranties(
+        redis: Redis,
+        file: UploadFile
+) -> None:
+    unique_file_name = await create_unique_excel_name(file=file)
+    await upload_to_s3(file=file.file, unique_filename=unique_file_name)
+    await redis.set(name=f"file:{unique_file_name}", value=1, ex=1)
+
+# ==================== Extract excel data and insert them to db ==================== #
+
+async def process_excel_data(
+        file: BytesIO,
+        session: async_sessionmaker[AsyncSession],
+        batch_size: int = 500
+) -> None:
+    workbook = load_workbook(file)
+    sheet = workbook.active
+
+    all_rows = [
+        {
+            Guaranty.product_serial_number:row[0],
+            Guaranty.guaranty_serial: row[1],
+            Guaranty.product_name: row[2],
+            Guaranty.date_of_document: row[4].replace(" ق.ظ", "").replace(" ب.ظ", "")
+        } for row in sheet.iter_rows(min_row=2, values_only=True)
+    ]
+
+    def chunks(data: list, chunk_size: int):
+        for chunk in range(0, len(data), chunk_size):
+            yield data[chunk: chunk + chunk_size]
+
+    try:
+        async with session.begin() as conn:
+            for batch in chunks(all_rows, batch_size):
+                query = sa.insert(Guaranty).values(batch)
+                await conn.execute(query)
+            # TODO: Send a message for admin user if data sent successfully here.
+    except IntegrityError as ex:
+        if "uq_guaranties_guaranty_serial" in str(ex):
+            raise exceptions.DuplicateGuarantySerial
+        else:
+            logger.warning(ex)
+            print(ex)

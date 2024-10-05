@@ -12,6 +12,7 @@ from src.auth import types as auth_types
 from src.products import types as product_types
 from src.cart import types as cart_types
 from src.sales import types as sale_types
+from src.admin import types as admin_types
 
 POSTGRES_URL = str(settings.POSTGRES_URL)
 
@@ -33,7 +34,9 @@ class Base(MappedAsDataclass, DeclarativeBase):
         product_types.AttributeValueId: INTEGER,
         product_types.CommentId: INTEGER,
         sale_types.SaleId: INTEGER,
-        cart_types.CartId: INTEGER
+        cart_types.CartId: INTEGER,
+        admin_types.GuarantyId: INTEGER,
+        admin_types.GuarantySerial: String
     }
 
 
