@@ -18,6 +18,7 @@ class Config(CustomBaseSettings):
     POSTGRES_URL: PostgresDsn
     ENVIRONMENT: Environment = Environment.PRODUCTION
     REDIS_HOST: str
+    CORS_ORIGINS: str
     REDIS_PORT: int
     APP_VERSION: str = "0.1"
 
