@@ -9,6 +9,7 @@ from src.admin import schemas
 from src.admin import service
 from src.products.types import CategoryId, ProductId, CommentId
 from src.auth.dependencies import is_admin
+from src.tickets.types import TicketId
 
 router = APIRouter()
 
@@ -470,3 +471,36 @@ async def add_guaranties(
         file=file
     )
     return {"detail": "Created successfully."}
+
+# ==================== Ticket routes ==================== #
+
+@router.get(
+    "/list-tickets/",
+    status_code=status.HTTP_200_OK,
+    response_model=PaginatedResponse[schemas.TicketList]
+)
+async def list_tickets(
+    engine: Annotated[AsyncEngine, Depends(get_engine)],
+    is_admin: Annotated[bool, Depends(is_admin)],
+    pagination_info: Annotated[PaginationQuerySchema, Depends(pagination_query)]
+) -> dict:
+    result = await service.list_tickets(
+        engine=engine,
+        limit=pagination_info.limit,
+        offset=pagination_info.offset
+    )
+    return result
+
+
+@router.delete(
+    "/delete-ticket/{ticket_id}/",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_ticket(
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+    ticket_id: TicketId
+) -> None:
+    await service.delete_ticket(
+        session=session,
+        ticket_id=ticket_id
+    )

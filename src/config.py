@@ -71,6 +71,10 @@ class LogConfig(BaseModel):
         'admin': {
             'handlers': ['file', 'console'],
             'propagate': False,
+        },
+        'tickets': {
+            'handlers': ['file', 'console'],
+            'propagate': False,
         }
     }
 

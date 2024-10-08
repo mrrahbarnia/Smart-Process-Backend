@@ -11,6 +11,7 @@ from src.auth import router as auth_router
 from src.admin import router as admin_router
 from src.products import router as products_router
 from src.cart import router as cart_router
+from src.tickets import router as ticket_router
 
 logger = logging.getLogger("root")
 
@@ -41,3 +42,4 @@ app.include_router(router=auth_router.router, prefix="/auth", tags=["auth"])
 app.include_router(router=admin_router.router, prefix="/admin", tags=["admin"])
 app.include_router(router=products_router.router, prefix="/products", tags=["products"])
 app.include_router(router=cart_router.router, prefix="/cart", tags=["cart"])
+app.include_router(router=ticket_router.router, prefix="/tickets", tags=["tickets"])

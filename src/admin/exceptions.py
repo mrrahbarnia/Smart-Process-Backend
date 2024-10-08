@@ -102,3 +102,9 @@ class DuplicateGuarantySerial(HTTPException):
     def __init__(self) -> None:
         self.status_code = status.HTTP_409_CONFLICT
         self.detail = "Unique guaranty serial!"
+
+
+class TicketNotFound(HTTPException):
+    def __init__(self) -> None:
+        self.status_code = status.HTTP_404_NOT_FOUND
+        self.detail = "There is no ticket with the provided info!"

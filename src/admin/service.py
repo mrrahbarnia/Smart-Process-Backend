@@ -30,7 +30,8 @@ from src.products.models import (
     Comment
 )
 from src.s3.utils import upload_to_s3, delete_from_s3
-from src.auth.models import User
+from src.tickets.models import Ticket
+from src.tickets.types import TicketId
 
 logger = logging.getLogger("admin")
 
@@ -699,4 +700,41 @@ async def process_excel_data(
             raise exceptions.DuplicateGuarantySerial
         else:
             logger.warning(ex)
-            print(ex)
+
+# ==================== Ticket service ==================== #
+
+async def list_tickets(
+        engine: AsyncEngine,
+        limit: int,
+        offset: int
+):
+    query = sa.select(
+        Ticket.id,
+        Ticket.name,
+        Ticket.product_serial,
+        Ticket.phone_number,
+        Ticket.guaranty_rating,
+        Ticket.repairs_rating,
+        Ticket.notification_rating,
+        Ticket.personal_behavior_rating,
+        Ticket.services_rating,
+        Ticket.smart_process_rating,
+        Ticket.criticism,
+        Ticket.call_request
+    ).order_by(Ticket.created_at)
+    return await paginate(
+        engine=engine, query=query, limit=limit, offset=offset
+    )
+
+
+async def delete_ticket(
+        session: async_sessionmaker[AsyncSession],
+        ticket_id: TicketId
+) -> None:
+    query = sa.delete(Ticket).where(
+        Ticket.id==ticket_id
+    ).returning(Ticket.id)
+    async with session.begin() as conn:
+        result: TicketId | None = await conn.scalar(query)
+    if result is None:
+        raise exceptions.TicketNotFound

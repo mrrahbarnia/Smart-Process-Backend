@@ -74,7 +74,7 @@ services:
       - redis-volume:/data
 
 
-name: smart-process
+name: smart-process-development
 volumes:
   devdb-volume:
   redis-volume:

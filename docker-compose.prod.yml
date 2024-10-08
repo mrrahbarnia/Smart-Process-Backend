@@ -62,7 +62,7 @@ services:
     volumes:
       - redis-volume:/data
 
-name: smart-process
+name: smart-process-deplyment
 volumes:
   proddb-volume:
   redis-volume:
