@@ -7,6 +7,13 @@ from src.products.types import ProductId, SerialNumber
 GuarantyId = NewType("GuarantyId", int)
 GuarantySerial = NewType("GuarantySerial", str)
 
+class ExcelEntityTypes(TypedDict):
+    product_serial_number: str
+    guaranty_serial: str
+    product_name: str
+    guaranty_days: str
+    produced_at: str
+
 class ProductDetailResponse(TypedDict):
     id: ProductId
     serial_number: SerialNumber

@@ -27,4 +27,5 @@ class InquiryGuarantyOut(CustomBaseModel):
         Field(alias="guarantySerial")
     ]
     product_name: Annotated[str, Field(alias="productName")]
+    guaranty_days: Annotated[int, Field(alias="guarantyDays")]
     date_of_document: Annotated[str, Field(alias="dateOfDocument")]

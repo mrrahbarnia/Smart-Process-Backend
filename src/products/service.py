@@ -9,7 +9,7 @@ from src.pagination import paginate
 from src.products import exceptions
 from src.products import schemas
 from src.products.models import Brand, Category, Comment, Product, ProductImage, AttributeValue
-from src.products.types import ProductId, CommentId, CommentListResponse
+from src.products.types import ProductId, CommentId, SerialNumber, CommentListResponse
 from src.products.config import products_config
 from src.auth.models import User
 from src.auth.types import UserId
@@ -262,7 +262,7 @@ async def list_products(
 
 async def product_detail(
         session: async_sessionmaker[AsyncSession],
-        product_id: ProductId,
+        product_serial: SerialNumber,
 ) -> ProductDetailResponse:
     query = (
         sa.select(
@@ -288,7 +288,7 @@ async def product_detail(
         .join(AttributeValue, Product.id==AttributeValue.product_id, isouter=True)
         .where(
             sa.and_(
-                Product.id==product_id,
+                Product.serial_number==product_serial,
                 Product.is_active.is_(True),
                 Brand.is_active.is_(True),
                 Category.is_active.is_(True)
@@ -330,7 +330,8 @@ async def inquiry_guaranty(
         Guaranty.product_serial_number,
         Guaranty.guaranty_serial,
         Guaranty.product_name,
-        Guaranty.date_of_document
+        Guaranty.guaranty_days,
+        Guaranty.produced_at
     ).where(
         Guaranty.guaranty_serial==serial_number
     )
