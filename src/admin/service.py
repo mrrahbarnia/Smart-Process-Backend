@@ -1,4 +1,5 @@
 import logging
+import asyncio
 import sqlalchemy as sa
 import sqlalchemy.orm as so
 
@@ -8,17 +9,18 @@ from fastapi import UploadFile
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, async_sessionmaker
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.dialects.postgresql import insert as postgres_upsert
 
 from src.admin import schemas
 from src.admin import exceptions
 from src.admin.models import Guaranty
-from src.admin.types import ProductDetailResponse
+from src.admin.types import ProductDetailResponse, ExcelEntityTypes
 from src.admin.utils import (
     validate_images_and_return_unique_image_names,
     create_unique_excel_name
 )
 from src.pagination import paginate
-from src.products.types import CategoryId, BrandId, ProductId, CommentId
+from src.products.types import CategoryId, BrandId, ProductId, CommentId, SerialNumber
 from src.products.models import (
     Brand,
     Category,
@@ -30,7 +32,8 @@ from src.products.models import (
     Comment
 )
 from src.s3.utils import upload_to_s3, delete_from_s3
-from src.auth.models import User
+from src.tickets.models import Ticket
+from src.tickets.types import TicketId
 
 logger = logging.getLogger("admin")
 
@@ -413,6 +416,7 @@ async def create_product(
         session: async_sessionmaker[AsyncSession],
 ) -> None:
     image_unique_names = await validate_images_and_return_unique_image_names(images)
+
     category_query = sa.select(Category.id).where(
         Category.name==payload.category_name
     )
@@ -472,8 +476,10 @@ async def create_product(
             if "fk_attributevalues_product_id_products" in str(ex):
                 raise exceptions.ProductNotFound
 
-    for image_unique_name, image_file in image_unique_names.items():
-        await upload_to_s3(file=image_file, unique_filename=image_unique_name)
+    await asyncio.gather(*[
+        upload_to_s3(file=image_file, unique_filename=image_unique_name)
+        for image_unique_name, image_file in image_unique_names.items()
+    ])
 
 
 async def activate_product(
@@ -594,7 +600,7 @@ async def list_products(
 
 async def product_detail(
         session: async_sessionmaker[AsyncSession],
-        product_id: ProductId,
+        product_serial: SerialNumber,
 ) -> ProductDetailResponse:
     query = (
         sa.select(
@@ -618,7 +624,7 @@ async def product_detail(
         .join(Brand, Product.brand_id==Brand.id)
         .join(ProductImage, Product.id==ProductImage.product_id, isouter=True)
         .join(AttributeValue, Product.id==AttributeValue.product_id, isouter=True)
-        .where(Product.id==product_id)
+        .where(Product.serial_number==product_serial)
     )
     async with session.begin() as conn:
         result = (await conn.execute(query)).all()
@@ -675,12 +681,13 @@ async def process_excel_data(
     workbook = load_workbook(file)
     sheet = workbook.active
 
-    all_rows = [
+    all_rows: list[ExcelEntityTypes] = [
         {
-            Guaranty.product_serial_number:row[0],
-            Guaranty.guaranty_serial: row[1],
-            Guaranty.product_name: row[2],
-            Guaranty.date_of_document: row[4].replace(" ق.ظ", "").replace(" ب.ظ", "")
+            "product_serial_number":row[0],
+            "guaranty_serial": row[1],
+            "product_name": row[2],
+            "guaranty_days": row[3],
+            "produced_at": row[4].replace(" ق.ظ", "").replace(" ب.ظ", "")
         } for row in sheet.iter_rows(min_row=2, values_only=True)
     ]
 
@@ -691,12 +698,47 @@ async def process_excel_data(
     try:
         async with session.begin() as conn:
             for batch in chunks(all_rows, batch_size):
-                query = sa.insert(Guaranty).values(batch)
+                query = postgres_upsert(Guaranty).values(batch)
+                query = query.on_conflict_do_nothing()
                 await conn.execute(query)
-            # TODO: Send a message for admin user if data sent successfully here.
+            # TODO: Send a message for admin user if data processed successfully here.
     except IntegrityError as ex:
-        if "uq_guaranties_guaranty_serial" in str(ex):
-            raise exceptions.DuplicateGuarantySerial
-        else:
-            logger.warning(ex)
-            print(ex)
+        logger.warning(f"Unexpected error occurred {ex}")
+
+# ==================== Ticket service ==================== #
+
+async def list_tickets(
+        engine: AsyncEngine,
+        limit: int,
+        offset: int
+):
+    query = sa.select(
+        Ticket.id,
+        Ticket.name,
+        Ticket.product_serial,
+        Ticket.phone_number,
+        Ticket.guaranty_rating,
+        Ticket.repairs_rating,
+        Ticket.notification_rating,
+        Ticket.personal_behavior_rating,
+        Ticket.services_rating,
+        Ticket.smart_process_rating,
+        Ticket.criticism,
+        Ticket.call_request
+    ).order_by(Ticket.created_at)
+    return await paginate(
+        engine=engine, query=query, limit=limit, offset=offset
+    )
+
+
+async def delete_ticket(
+        session: async_sessionmaker[AsyncSession],
+        ticket_id: TicketId
+) -> None:
+    query = sa.delete(Ticket).where(
+        Ticket.id==ticket_id
+    ).returning(Ticket.id)
+    async with session.begin() as conn:
+        result: TicketId | None = await conn.scalar(query)
+    if result is None:
+        raise exceptions.TicketNotFound

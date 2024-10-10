@@ -9,7 +9,7 @@ from src.pagination import paginate
 from src.products import exceptions
 from src.products import schemas
 from src.products.models import Brand, Category, Comment, Product, ProductImage, AttributeValue
-from src.products.types import ProductId, CommentId, CommentListResponse
+from src.products.types import ProductId, CommentId, SerialNumber, CommentListResponse
 from src.products.config import products_config
 from src.auth.models import User
 from src.auth.types import UserId
@@ -192,6 +192,19 @@ async def list_products(
             Product.price,
             Product.discount,
             Product.is_active,
+            sa.func.round(
+                sa.case(
+                (
+                    (
+                        Product.discount.is_not(None) &
+                        Product.expiry_discount.is_not(None) &
+                        (Product.expiry_discount >= sa.func.current_date())
+                    ),
+                    Product.price * (1 - Product.discount / 100)
+                ),
+                    else_=None
+                ), 6
+            ).label("price_after_discount"),
             Category.name.label("category_name"),
             Brand.name.label("brand_name"),
             sub_query.c.url.label("image_url")
@@ -262,7 +275,7 @@ async def list_products(
 
 async def product_detail(
         session: async_sessionmaker[AsyncSession],
-        product_id: ProductId,
+        product_serial: SerialNumber,
 ) -> ProductDetailResponse:
     query = (
         sa.select(
@@ -275,6 +288,19 @@ async def product_detail(
             Product.is_active,
             Product.description,
             Product.expiry_discount,
+            sa.func.round(
+                sa.case(
+                (
+                    (
+                        Product.discount.is_not(None) &
+                        Product.expiry_discount.is_not(None) &
+                        (Product.expiry_discount >= sa.func.current_date())
+                    ),
+                    Product.price * (1 - Product.discount / 100)
+                ),
+                    else_=None
+                ), 6
+            ).label("price_after_discount"),
             Category.name.label("category_name"),
             Brand.name.label("brand_name"),
             AttributeValue.attribute_name.label("attribute"),
@@ -288,7 +314,7 @@ async def product_detail(
         .join(AttributeValue, Product.id==AttributeValue.product_id, isouter=True)
         .where(
             sa.and_(
-                Product.id==product_id,
+                Product.serial_number==product_serial,
                 Product.is_active.is_(True),
                 Brand.is_active.is_(True),
                 Category.is_active.is_(True)
@@ -314,6 +340,7 @@ async def product_detail(
         "discount": result[0].discount,
         "description": result[0].description,
         "expiry_discount": result[0].expiry_discount,
+        "price_after_discount": result[0].price_after_discount,
         "category_name": result[0].category_name,
         "brand_name": result[0].brand_name,
         "image_urls": set([p.image_urls for p in result]),
@@ -330,7 +357,8 @@ async def inquiry_guaranty(
         Guaranty.product_serial_number,
         Guaranty.guaranty_serial,
         Guaranty.product_name,
-        Guaranty.date_of_document
+        Guaranty.guaranty_days,
+        Guaranty.produced_at
     ).where(
         Guaranty.guaranty_serial==serial_number
     )

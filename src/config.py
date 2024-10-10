@@ -17,6 +17,7 @@ class CustomBaseSettings(BaseSettings):
 class Config(CustomBaseSettings):
     POSTGRES_URL: PostgresDsn
     ENVIRONMENT: Environment = Environment.PRODUCTION
+    CORS_ORIGINS: str
     REDIS_HOST: str
     CORS_ORIGINS: str
     REDIS_PORT: int
@@ -70,6 +71,10 @@ class LogConfig(BaseModel):
             'propagate': False,
         },
         'admin': {
+            'handlers': ['file', 'console'],
+            'propagate': False,
+        },
+        'tickets': {
             'handlers': ['file', 'console'],
             'propagate': False,
         }

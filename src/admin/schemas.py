@@ -14,9 +14,10 @@ from pydantic import (
 
 from src.utils import slugify
 from src.schemas import CustomBaseModel
-from src.admin.types import GuarantySerial
 from src.products import types as product_types
 from src.s3.config import storage_config
+from src.tickets.schemas import TicketIn
+from src.tickets.types import TicketId
 
 
 class Brand(BaseModel):
@@ -131,3 +132,7 @@ class ProductQuerySearch(CustomBaseModel):
         if isinstance(value, str):
             return cls(**json.loads(value))
         return value
+
+
+class TicketList(TicketIn):
+    id: TicketId

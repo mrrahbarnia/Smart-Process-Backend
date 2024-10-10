@@ -7,12 +7,12 @@ from src.database import get_redis, get_session, get_engine
 from src.pagination import PaginatedResponse, PaginationQuerySchema, pagination_query
 from src.products import service
 from src.products import schemas
-from src.products.types import ProductId, CommentId, CommentListResponse
+from src.products.types import ProductId, SerialNumber, CommentId, CommentListResponse
 from src.admin.schemas import Brand
 from src.admin.types import GuarantySerial
 from src.auth.models import User
 from src.auth.dependencies import get_current_active_user
-from src.admin.schemas import ProductQuerySearch, ProductList, ProductDetail
+from src.admin.schemas import ProductQuerySearch
 from src.admin.types import ProductDetailResponse
 
 router = APIRouter()
@@ -123,7 +123,7 @@ async def delete_my_comment(
 @router.get(
     "/list-products/",
     status_code=status.HTTP_200_OK,
-    response_model=PaginatedResponse[ProductList]
+    response_model=PaginatedResponse[schemas.UsersProductList]
 )
 async def list_products(
     filter_query: Annotated[ProductQuerySearch, Query()],
@@ -140,17 +140,17 @@ async def list_products(
 
 
 @router.get(
-    "/product-detail/{product_id}/",
+    "/product-detail/{product_serial}/",
     status_code=status.HTTP_200_OK,
-    response_model=ProductDetail
+    response_model=schemas.UsersProductDetail
 )
 async def product_detail(
-    product_id: ProductId,
+    product_serial: SerialNumber,
     session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
 ) -> ProductDetailResponse:
     result = await service.product_detail(
         session=session,
-        product_id=product_id
+        product_serial=product_serial
     )
     return result
 

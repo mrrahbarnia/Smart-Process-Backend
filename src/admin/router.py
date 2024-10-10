@@ -7,8 +7,9 @@ from src.database import get_session, get_redis, get_engine
 from src.pagination import PaginatedResponse, pagination_query, PaginationQuerySchema
 from src.admin import schemas
 from src.admin import service
-from src.products.types import CategoryId, ProductId, CommentId
+from src.products.types import CategoryId, ProductId, SerialNumber, CommentId
 from src.auth.dependencies import is_admin
+from src.tickets.types import TicketId
 
 router = APIRouter()
 
@@ -347,7 +348,7 @@ async def create_product(
     images: list[UploadFile],
     is_admin: Annotated[bool, Depends(is_admin)],
     session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
-):
+) -> dict:
     await service.create_product(
         session=session,
         payload=payload,
@@ -357,7 +358,7 @@ async def create_product(
 
 
 @router.put(
-    "/activate-product/{product_id}/",
+    "/activate-product/{product_serial}/",
     status_code=status.HTTP_204_NO_CONTENT
 )
 async def activate_product(
@@ -422,18 +423,18 @@ async def list_products(
 
 
 @router.get(
-    "/product-detail/{product_id}/",
+    "/product-detail/{product_serial}/",
     status_code=status.HTTP_200_OK,
     response_model=schemas.ProductDetail
 )
 async def product_detail(
-    product_id: ProductId,
+    product_serial: SerialNumber,
     is_admin: Annotated[bool, Depends(is_admin)],
     session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
 ):
     result = await service.product_detail(
         session=session,
-        product_id=product_id
+        product_serial=product_serial
     )
     return result
 
@@ -470,3 +471,36 @@ async def add_guaranties(
         file=file
     )
     return {"detail": "Created successfully."}
+
+# ==================== Ticket routes ==================== #
+
+@router.get(
+    "/list-tickets/",
+    status_code=status.HTTP_200_OK,
+    response_model=PaginatedResponse[schemas.TicketList]
+)
+async def list_tickets(
+    engine: Annotated[AsyncEngine, Depends(get_engine)],
+    is_admin: Annotated[bool, Depends(is_admin)],
+    pagination_info: Annotated[PaginationQuerySchema, Depends(pagination_query)]
+) -> dict:
+    result = await service.list_tickets(
+        engine=engine,
+        limit=pagination_info.limit,
+        offset=pagination_info.offset
+    )
+    return result
+
+
+@router.delete(
+    "/delete-ticket/{ticket_id}/",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_ticket(
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+    ticket_id: TicketId
+) -> None:
+    await service.delete_ticket(
+        session=session,
+        ticket_id=ticket_id
+    )
