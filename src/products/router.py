@@ -123,7 +123,7 @@ async def delete_my_comment(
 @router.get(
     "/list-products/",
     status_code=status.HTTP_200_OK,
-    response_model=PaginatedResponse[ProductList]
+    response_model=PaginatedResponse[schemas.UsersProductList]
 )
 async def list_products(
     filter_query: Annotated[ProductQuerySearch, Query()],
@@ -142,7 +142,7 @@ async def list_products(
 @router.get(
     "/product-detail/{product_serial}/",
     status_code=status.HTTP_200_OK,
-    response_model=ProductDetail
+    response_model=schemas.UsersProductDetail
 )
 async def product_detail(
     product_serial: SerialNumber,

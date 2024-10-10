@@ -31,10 +31,10 @@ class Ticket(Base):
     services_rating: so.Mapped[int]
     smart_process_rating: so.Mapped[int]
     criticism: so.Mapped[str] = so.mapped_column(sa.Text)
-    call_request: so.Mapped[bool]
     created_at: so.Mapped[datetime] = so.mapped_column(
         sa.TIMESTAMP(timezone=True), server_default=sa.func.now()
     )
+    call_request: so.Mapped[bool]
 
     def __repr__(self) -> str:
         return f"{self.id}"

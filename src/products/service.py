@@ -1,5 +1,6 @@
 import json
 import sqlalchemy as sa
+import sqlalchemy.orm as so
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
@@ -192,6 +193,19 @@ async def list_products(
             Product.price,
             Product.discount,
             Product.is_active,
+            sa.func.round(
+                sa.case(
+                (
+                    (
+                        Product.discount.is_not(None) &
+                        Product.expiry_discount.is_not(None) &
+                        (Product.expiry_discount >= sa.func.current_date())
+                    ),
+                    Product.price * (1 - Product.discount / 100)
+                ),
+                    else_=None
+                ), 6
+            ).label("price_after_discount"),
             Category.name.label("category_name"),
             Brand.name.label("brand_name"),
             sub_query.c.url.label("image_url")
@@ -275,6 +289,19 @@ async def product_detail(
             Product.is_active,
             Product.description,
             Product.expiry_discount,
+            sa.func.round(
+                sa.case(
+                (
+                    (
+                        Product.discount.is_not(None) &
+                        Product.expiry_discount.is_not(None) &
+                        (Product.expiry_discount >= sa.func.current_date())
+                    ),
+                    Product.price * (1 - Product.discount / 100)
+                ),
+                    else_=None
+                ), 6
+            ).label("price_after_discount"),
             Category.name.label("category_name"),
             Brand.name.label("brand_name"),
             AttributeValue.attribute_name.label("attribute"),
@@ -314,6 +341,7 @@ async def product_detail(
         "discount": result[0].discount,
         "description": result[0].description,
         "expiry_discount": result[0].expiry_discount,
+        "price_after_discount": result[0].price_after_discount,
         "category_name": result[0].category_name,
         "brand_name": result[0].brand_name,
         "image_urls": set([p.image_urls for p in result]),

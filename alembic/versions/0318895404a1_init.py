@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 0dfa4390902f
+Revision ID: 0318895404a1
 Revises: 
-Create Date: 2024-10-08 17:33:14.012221
+Create Date: 2024-10-10 11:51:20.843781
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '0dfa4390902f'
+revision: str = '0318895404a1'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -72,8 +72,8 @@ def upgrade() -> None:
     sa.Column('services_rating', sa.Integer(), nullable=False),
     sa.Column('smart_process_rating', sa.Integer(), nullable=False),
     sa.Column('criticism', sa.Text(), nullable=False),
-    sa.Column('call_request', sa.Boolean(), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('call_request', sa.Boolean(), nullable=False),
     sa.CheckConstraint('CHAR_LENGTH(phone_number) = 11', name=op.f('ck_tickets_check_phone_length')),
     sa.CheckConstraint('guaranty_rating BETWEEN 1 AND 5', name=op.f('ck_tickets_check_guaranty_rating')),
     sa.CheckConstraint('notification_rating BETWEEN 1 AND 5', name=op.f('ck_tickets_check_notification_rating')),
