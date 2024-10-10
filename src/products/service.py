@@ -1,6 +1,5 @@
 import json
 import sqlalchemy as sa
-import sqlalchemy.orm as so
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker

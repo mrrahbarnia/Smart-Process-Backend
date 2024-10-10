@@ -12,7 +12,7 @@ from src.admin.schemas import Brand
 from src.admin.types import GuarantySerial
 from src.auth.models import User
 from src.auth.dependencies import get_current_active_user
-from src.admin.schemas import ProductQuerySearch, ProductList, ProductDetail
+from src.admin.schemas import ProductQuerySearch
 from src.admin.types import ProductDetailResponse
 
 router = APIRouter()

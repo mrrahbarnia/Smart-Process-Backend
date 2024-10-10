@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from src.config import LogConfig, app_configs
+from src.config import LogConfig, app_configs, settings
 from src.auth import router as auth_router
 from src.admin import router as admin_router
 from src.products import router as products_router
@@ -25,10 +25,7 @@ async def lifespan(_application: FastAPI) -> AsyncGenerator:
 
 app = FastAPI(**app_configs, lifespan=lifespan)
 
-origins = [
-    "http://127.0.0.1:3000",
-    "http://localhost:3000"
-]
+origins = settings.CORS_ORIGINS.split(",")
 
 app.add_middleware(
     CORSMiddleware,
