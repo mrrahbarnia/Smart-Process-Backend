@@ -24,7 +24,6 @@ class ProductDetailResponse(TypedDict):
     discount: int
     description: str
     expiry_discount: datetime
-    price_after_discount: Decimal
     category_name: str
     brand_name: str
     image_urls: set[str]

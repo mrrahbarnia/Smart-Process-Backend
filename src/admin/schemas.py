@@ -52,7 +52,7 @@ class AllCategories(CustomBaseModel):
     id: product_types.CategoryId
     name: str
     description: str
-    is_active: bool
+    is_active: Annotated[bool, Field(alias="isActive")]
     parent_name: Annotated[str | None, Field(alias="parentName")] = None
 
 

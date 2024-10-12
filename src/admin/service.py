@@ -222,16 +222,6 @@ async def update_category_by_id(
         await redis.delete("root-categories")
 
 
-async def search_category_by_name(
-        session: async_sessionmaker[AsyncSession],
-        category_name: str
-) -> list[str]:
-    query = sa.select(Category).where(Category.name.ilike(f"%{category_name}%"))
-    async with session.begin() as conn:
-        result = (await conn.scalars(query)).all()
-    return [cat.name for cat in result]
-
-
 async def activate_category(
         category_id: CategoryId,
         session: async_sessionmaker[AsyncSession],

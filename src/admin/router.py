@@ -155,23 +155,6 @@ async def update_category_by_id(
     )
 
 
-@router.get(
-    "/search-categories/",
-    status_code=status.HTTP_200_OK,
-    response_model=list[str]
-)
-async def search_category_by_name(
-    category_name: str,
-    is_admin: Annotated[bool, Depends(is_admin)],
-    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)]
-) -> list[str]:
-    result = await service.search_category_by_name(
-        session=session,
-        category_name=category_name
-    )
-    return result
-
-
 @router.put(
     "/activate-category/{category_id}/",
     status_code=status.HTTP_204_NO_CONTENT
