@@ -7,13 +7,18 @@ from src.database import get_redis, get_session, get_engine
 from src.pagination import PaginatedResponse, PaginationQuerySchema, pagination_query
 from src.products import service
 from src.products import schemas
-from src.products.types import ProductId, SerialNumber, CommentId, CommentListResponse
+from src.products.types import (
+    ProductId,
+    SerialNumber,
+    CommentId,
+    CommentListResponse,
+    UserProductDetailResponse
+)
 from src.admin.schemas import Brand
 from src.admin.types import GuarantySerial
 from src.auth.models import User
 from src.auth.dependencies import get_current_active_user
 from src.admin.schemas import ProductQuerySearch
-from src.admin.types import ProductDetailResponse
 
 router = APIRouter()
 
@@ -35,6 +40,22 @@ async def active_brands(
     return result
 
 # ==================== Categories routes ==================== #
+
+@router.get(
+    "/search-categories/",
+    status_code=status.HTTP_200_OK,
+    response_model=list[str]
+)
+async def search_category_by_name(
+    category_name: str,
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)]
+) -> list[str]:
+    result = await service.search_category_by_name(
+        session=session,
+        category_name=category_name
+    )
+    return result
+
 
 @router.get(
     "/root-categories/",
@@ -147,7 +168,7 @@ async def list_products(
 async def product_detail(
     product_serial: SerialNumber,
     session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
-) -> ProductDetailResponse:
+) -> UserProductDetailResponse:
     result = await service.product_detail(
         session=session,
         product_serial=product_serial

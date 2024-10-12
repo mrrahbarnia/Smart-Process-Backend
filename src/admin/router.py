@@ -68,6 +68,25 @@ async def delete_brand(
     await service.delete_brand(session=session, slug=slug, redis=redis)
 
 
+@router.put(
+    "/update-brand/{brand_slug}/",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def update_brand_by_slug(
+    brand_slug: str,
+    payload: schemas.Brand,
+    is_admin: Annotated[bool, Depends(is_admin)],
+    redis: Annotated[Redis, Depends(get_redis)],
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+):
+    await service.update_brand_by_slug(
+        session=session,
+        brand_slug=brand_slug,
+        payload=payload,
+        redis=redis
+    )
+
+
 @router.get(
         "/all-brands/",
         status_code=status.HTTP_200_OK,
@@ -153,23 +172,6 @@ async def update_category_by_id(
         payload=payload,
         redis=redis
     )
-
-
-@router.get(
-    "/search-categories/",
-    status_code=status.HTTP_200_OK,
-    response_model=list[str]
-)
-async def search_category_by_name(
-    category_name: str,
-    is_admin: Annotated[bool, Depends(is_admin)],
-    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)]
-) -> list[str]:
-    result = await service.search_category_by_name(
-        session=session,
-        category_name=category_name
-    )
-    return result
 
 
 @router.put(

@@ -44,6 +44,9 @@ class Brand(Base):
     name: so.Mapped[str] = so.mapped_column(sa.String(200), unique=True)
     slug: so.Mapped[str] = so.mapped_column(sa.String(250), index=True)
     description: so.Mapped[str] = so.mapped_column(sa.Text)
+    created_at: so.Mapped[datetime] = so.mapped_column(
+        sa.TIMESTAMP(timezone=True), server_default=sa.func.now()
+    )
     is_active: so.Mapped[bool] = so.mapped_column(default=True)
 
     def __repr__(self) -> str:

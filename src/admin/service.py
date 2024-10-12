@@ -14,7 +14,7 @@ from sqlalchemy.dialects.postgresql import insert as postgres_upsert
 from src.admin import schemas
 from src.admin import exceptions
 from src.admin.models import Guaranty
-from src.admin.types import ProductDetailResponse, ExcelEntityTypes
+from src.admin.types import AdminProductDetailResponse, ExcelEntityTypes
 from src.admin.utils import (
     validate_images_and_return_unique_image_names,
     create_unique_excel_name
@@ -75,6 +75,27 @@ async def activate_brand(
     await redis.delete("brand-list")
 
 
+async def update_brand_by_slug(
+        brand_slug: str,
+        session: async_sessionmaker[AsyncSession],
+        payload: schemas.Brand,
+        redis: Redis
+) -> None:
+    query = sa.update(Brand).values(
+        {
+            Brand.name: payload.name,
+            Brand.description: payload.description,
+            Brand.slug: payload.slug
+        }
+    ).where(Brand.slug==brand_slug).returning(Brand.id)
+    async with session.begin() as conn:
+        result: BrandId | None = await conn.scalar(query)
+    if result is None:
+        raise exceptions.BrandNotFound
+    else:
+        await redis.delete("brand-list")
+
+
 async def deactivate_brand(
         slug: str,
         session: async_sessionmaker[AsyncSession],
@@ -104,7 +125,7 @@ async def delete_brand(
 async def all_brands(engine: AsyncEngine, limit: int, offset: int):
     query = sa.select(
         Brand.name, Brand.slug, Brand.description, Brand.is_active
-    )
+    ).order_by(Brand.created_at.desc())
     return await paginate(
         engine=engine, query=query, limit=limit, offset=offset
     )
@@ -216,20 +237,10 @@ async def update_category_by_id(
         if updated_result is None:
             raise exceptions.CategoryNotFound
     except IntegrityError as ex:
-        if "uq_brands_name" in str(ex):
+        if "uq_categories_name" in str(ex):
             raise exceptions.DuplicateCategoryName
     if not payload.parent_category_name:
         await redis.delete("root-categories")
-
-
-async def search_category_by_name(
-        session: async_sessionmaker[AsyncSession],
-        category_name: str
-) -> list[str]:
-    query = sa.select(Category).where(Category.name.ilike(f"%{category_name}%"))
-    async with session.begin() as conn:
-        result = (await conn.scalars(query)).all()
-    return [cat.name for cat in result]
 
 
 async def activate_category(
@@ -601,7 +612,7 @@ async def list_products(
 async def product_detail(
         session: async_sessionmaker[AsyncSession],
         product_serial: SerialNumber,
-) -> ProductDetailResponse:
+) -> AdminProductDetailResponse:
     query = (
         sa.select(
             Product.id,

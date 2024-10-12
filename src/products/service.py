@@ -9,13 +9,19 @@ from src.pagination import paginate
 from src.products import exceptions
 from src.products import schemas
 from src.products.models import Brand, Category, Comment, Product, ProductImage, AttributeValue
-from src.products.types import ProductId, CommentId, SerialNumber, CommentListResponse
+from src.products.types import (
+    ProductId,
+    CommentId,
+    SerialNumber,
+    CommentListResponse,
+    UserProductDetailResponse
+)
 from src.products.config import products_config
 from src.auth.models import User
 from src.auth.types import UserId
 from src.admin.models import Guaranty
 from src.admin.schemas import ProductQuerySearch
-from src.admin.types import ProductDetailResponse, GuarantySerial
+from src.admin.types import GuarantySerial
 from src.admin.exceptions import ProductNotFound
 
 # ==================== Brand services ==================== #
@@ -46,6 +52,16 @@ async def active_brands(
     return result_list
 
 # ==================== Category services ==================== #
+
+async def search_category_by_name(
+        session: async_sessionmaker[AsyncSession],
+        category_name: str
+) -> list[str]:
+    query = sa.select(Category).where(Category.name.ilike(f"%{category_name}%"))
+    async with session.begin() as conn:
+        result = (await conn.scalars(query)).all()
+    return [cat.name for cat in result]
+
 
 async def root_categories(
         session: async_sessionmaker[AsyncSession],
@@ -276,7 +292,7 @@ async def list_products(
 async def product_detail(
         session: async_sessionmaker[AsyncSession],
         product_serial: SerialNumber,
-) -> ProductDetailResponse:
+) -> UserProductDetailResponse:
     query = (
         sa.select(
             Product.id,

@@ -1,6 +1,7 @@
 from typing import NewType, TypedDict
 from datetime import datetime
 from uuid import UUID
+from decimal import Decimal
 
 # ==================== Models types ==================== #
 
@@ -19,3 +20,20 @@ class CommentListResponse(TypedDict):
     username: str
     message: str
     created_at: datetime
+
+
+class UserProductDetailResponse(TypedDict):
+    id: ProductId
+    serial_number: SerialNumber
+    is_active: bool
+    name: str
+    stock: int
+    price: Decimal
+    discount: int
+    description: str
+    expiry_discount: datetime
+    price_after_discount: Decimal
+    category_name: str
+    brand_name: str
+    image_urls: set[str]
+    attribute_values: dict[str, str]
