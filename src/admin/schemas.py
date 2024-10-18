@@ -106,6 +106,7 @@ class ProductList(ProductBase):
 
 
 class ProductDetail(ProductBase):
+    id: product_types.ProductId
     is_active: Annotated[bool, Field(alias="isActive")]
     description: str
     expiry_discount: Annotated[date | None, Field(alias="expiryDiscount")] = None

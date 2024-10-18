@@ -8,7 +8,16 @@ from redis.asyncio import Redis
 from src.pagination import paginate
 from src.products import exceptions
 from src.products import schemas
-from src.products.models import Brand, Category, Comment, Product, ProductImage, AttributeValue
+from src.products.models import (
+    Brand,
+    Category,
+    Comment,
+    Product,
+    ProductImage,
+    AttributeValue,
+    CategoryAttribute,
+    Attribute
+)
 from src.products.types import (
     ProductId,
     CommentId,
@@ -51,16 +60,26 @@ async def active_brands(
     )
     return result_list
 
+
+async def search_brand_by_name(
+        session: async_sessionmaker[AsyncSession],
+        brand_name: str
+) -> list[str]:
+    query = sa.select(Brand.name).where(Brand.name.ilike(f"%{brand_name}%"))
+    async with session.begin() as conn:
+        result = (await conn.scalars(query)).all()
+    return [brand for brand in result]
+
 # ==================== Category services ==================== #
 
 async def search_category_by_name(
         session: async_sessionmaker[AsyncSession],
         category_name: str
 ) -> list[str]:
-    query = sa.select(Category).where(Category.name.ilike(f"%{category_name}%"))
+    query = sa.select(Category.name).where(Category.name.ilike(f"%{category_name}%"))
     async with session.begin() as conn:
         result = (await conn.scalars(query)).all()
-    return [cat.name for cat in result]
+    return [cat for cat in result]
 
 
 async def root_categories(
@@ -119,6 +138,21 @@ async def sub_categories(
             ex=products_config.SUB_CATEGORIES_CACHE_TTL
         )
     return result_list
+
+async def list_assigned_attributes(
+        category_name: str,
+        session: async_sessionmaker[AsyncSession],
+) -> list[str]:
+    query = (
+        sa.select(Attribute.name)
+        .select_from(Attribute)
+        .join(CategoryAttribute, CategoryAttribute.attribute_name==Attribute.name)
+        .join(Category, Category.id==CategoryAttribute.category_id)
+        .where(Category.name==category_name)
+    )
+    async with session.begin() as conn:
+        result = (await conn.scalars(query)).all()
+    return [attribute_name for attribute_name in result]
 
 # ==================== Comment services ==================== #
 
@@ -185,6 +219,20 @@ async def delete_my_comment(
         result: CommentId | None = await conn.scalar(query)
     if result is None:
         raise exceptions.CommentNotOwner
+
+# ==================== Attribute services ==================== #
+
+async def search_attribute(
+        session: async_sessionmaker[AsyncSession],
+        attribute_name: str
+) -> list[str]:
+    query = (
+        sa.select(Attribute.name)
+        .where(Attribute.name.ilike(f"%{attribute_name}%"))
+    )
+    async with session.begin() as conn:
+        result = (await conn.scalars(query)).all()
+    return [attr for attr in result]
 
 # ==================== Product services ==================== #
 

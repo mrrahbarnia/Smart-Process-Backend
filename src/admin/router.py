@@ -272,21 +272,6 @@ async def update_attribute(
         payload=payload
     )
 
-
-@router.get(
-        "/search-attribute/",
-        status_code=status.HTTP_200_OK
-)
-async def search_attribute(
-    is_admin: Annotated[bool, Depends(is_admin)],
-    attribute_name: str,
-    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)]
-) -> list[str]:
-    result = await service.search_attribute(
-        session=session, attribute_name=attribute_name
-    )
-    return result
-
 # ==================== CategoryAttributes routes ==================== #
 
 @router.post(
@@ -323,22 +308,6 @@ async def unassigned_category_attribute(
         attribute_name=attribute_name
     )
 
-
-@router.get(
-    "/list-assigned-attributes/{category_id}/",
-    status_code=status.HTTP_200_OK
-)
-async def list_assigned_attributes(
-    category_id: CategoryId,
-    is_admin: Annotated[bool, Depends(is_admin)],
-    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
-) -> list[str]:
-    result = await service.list_assigned_attributes(
-        category_id=category_id,
-        session=session
-    )
-    return result
-
 # ==================== Products routes ==================== #
 
 @router.post(
@@ -360,7 +329,7 @@ async def create_product(
 
 
 @router.put(
-    "/activate-product/{product_serial}/",
+    "/activate-product/{product_id}/",
     status_code=status.HTTP_204_NO_CONTENT
 )
 async def activate_product(

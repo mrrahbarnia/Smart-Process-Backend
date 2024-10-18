@@ -345,21 +345,8 @@ async def update_attribute(
         if result is None:
             raise exceptions.AttributeNotFound
     except IntegrityError as ex:
-        if "uq_attributes_name" in str(ex):
+        if "pk_attributes" in str(ex):
             raise exceptions.DuplicateAttributeName
-
-
-async def search_attribute(
-        session: async_sessionmaker[AsyncSession],
-        attribute_name: str
-) -> list[str]:
-    query = (
-        sa.select(Attribute.name)
-        .where(Attribute.name.ilike(f"%{attribute_name}%"))
-    )
-    async with session.begin() as conn:
-        result = (await conn.scalars(query)).all()
-    return [attr for attr in result]
 
 # ==================== CategoryAttributes service ==================== #
 
@@ -403,21 +390,6 @@ async def unassign_category_attribute(
         result: CategoryId | None = await conn.scalar(query)
         if result is None:
             raise exceptions.UnassignedWentWrong
-
-
-async def list_assigned_attributes(
-        category_id: CategoryId,
-        session: async_sessionmaker[AsyncSession],
-) -> list[str]:
-    query = (
-        sa.select(Attribute.name)
-        .select_from(Attribute)
-        .join(CategoryAttribute, CategoryAttribute.attribute_name==Attribute.name)
-        .where(CategoryAttribute.category_id==category_id)
-    )
-    async with session.begin() as conn:
-        result = (await conn.scalars(query)).all()
-    return [attribute_name for attribute_name in result]
 
 # ==================== Products service ==================== #
 
@@ -736,7 +708,7 @@ async def list_tickets(
         Ticket.smart_process_rating,
         Ticket.criticism,
         Ticket.call_request
-    ).order_by(Ticket.created_at)
+    ).order_by(Ticket.created_at.desc())
     return await paginate(
         engine=engine, query=query, limit=limit, offset=offset
     )

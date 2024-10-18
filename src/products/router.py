@@ -39,6 +39,22 @@ async def active_brands(
     )
     return result
 
+
+@router.get(
+    "/search-brands/",
+    status_code=status.HTTP_200_OK,
+    response_model=list[str]
+)
+async def search_brand_by_name(
+    brand_name: str,
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)]
+) -> list[str]:
+    result = await service.search_brand_by_name(
+        session=session,
+        brand_name=brand_name
+    )
+    return result
+
 # ==================== Categories routes ==================== #
 
 @router.get(
@@ -84,6 +100,36 @@ async def sub_categories(
         session=session,
         redis=redis,
         parent_id=parent_id
+    )
+    return result
+
+
+@router.get(
+    "/list-assigned-attributes/{category_name}/",
+    status_code=status.HTTP_200_OK
+)
+async def list_assigned_attributes(
+    category_name: str,
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+) -> list[str]:
+    result = await service.list_assigned_attributes(
+        category_name=category_name,
+        session=session
+    )
+    return result
+
+# ==================== Attributes routes ==================== #
+
+@router.get(
+        "/search-attribute/",
+        status_code=status.HTTP_200_OK
+)
+async def search_attribute(
+    attribute_name: str,
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)]
+) -> list[str]:
+    result = await service.search_attribute(
+        session=session, attribute_name=attribute_name
     )
     return result
 
