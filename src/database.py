@@ -14,6 +14,7 @@ from src.cart import types as cart_types
 from src.sales import types as sale_types
 from src.admin import types as admin_types
 from src.tickets import types as ticket_types
+from src.articles import types as article_types
 
 POSTGRES_URL = str(settings.POSTGRES_URL)
 
@@ -38,13 +39,19 @@ class Base(MappedAsDataclass, DeclarativeBase):
         cart_types.CartId: INTEGER,
         admin_types.GuarantyId: INTEGER,
         admin_types.GuarantySerial: String,
-        ticket_types.TicketId: INTEGER
+        ticket_types.TicketId: INTEGER,
+        article_types.ArticleId: UUID,
+        article_types.ArticleImageId: INTEGER,
+        article_types.TagId: INTEGER,
+        article_types.RatingId: INTEGER,
+        article_types.ArticleCommentId: INTEGER
     }
 
 
 @lru_cache
 def get_engine() -> AsyncEngine:
     return engine
+
 
 
 async def get_session() -> async_sessionmaker[AsyncSession]:

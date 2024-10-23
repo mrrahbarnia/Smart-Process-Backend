@@ -12,6 +12,7 @@ from src.cart import models as cart_models # noqa
 from src.sales import models as sales_models # noqa
 from src.admin import models as admin_models # noqa
 from src.tickets import models as ticket_models # noqa
+from src.articles import models as article_models # noqa
 
 from alembic import context
 
