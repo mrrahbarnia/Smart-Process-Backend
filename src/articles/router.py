@@ -6,6 +6,7 @@ from src.database import get_session
 from src.pagination import PaginatedResponse, PaginationQuerySchema, pagination_query
 from src.articles import schemas
 from src.articles import service
+from src.articles.types import ArticleId
 
 router = APIRouter()
 
@@ -27,4 +28,18 @@ async def list_articles(
     return result
 
 
+@router.get(
+    "/article-detail/{article_id}/",
+    response_model=schemas.ArticleDetail,
+    status_code=status.HTTP_200_OK
+)
+async def article_detail(
+    article_id: ArticleId,
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)]
+):
+    result = await service.article_detail(
+        article_id=article_id,
+        session=session
+    )
+    return result
     
