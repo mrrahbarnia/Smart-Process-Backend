@@ -27,6 +27,7 @@ class Article(Base):
     
 
 class ArticleImage(Base):
+    __tablename__ = "article_images"
     id: so.Mapped[types.ArticleImageId] = so.mapped_column(
         primary_key=True, autoincrement=True
     )
@@ -74,7 +75,7 @@ class ArticleTag(Base):
 class Rating(Base):
     __tablename__ = "ratings"
     __table_args__ = (
-        sa.CheckConstraint("rating BETWEEN 0 AND 5"),
+        sa.CheckConstraint("rating BETWEEN 0 AND 5", name="check_rating_limit"),
     )
     id: so.Mapped[types.RatingId] = so.mapped_column(
         primary_key=True, autoincrement=True

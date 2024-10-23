@@ -319,7 +319,6 @@ async def list_products(
         ).where(categories_cte.c.is_active.is_(True)).order_by(
             categories_cte.c.level
         )
-        
 
     if filter_query.name__contain:
         query = query.where(
