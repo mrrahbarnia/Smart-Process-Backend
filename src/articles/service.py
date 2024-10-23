@@ -2,11 +2,13 @@ import sqlalchemy as sa
 import sqlalchemy.orm as so
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+from sqlalchemy.dialects.postgresql import insert as postgres_insert
 
 from src.pagination import paginate
 from src.articles import exceptions
 from src.articles.models import Article, Rating, Tag, ArticleTag, ArticleImage
 from src.articles.types import ArticleId
+from src.auth.types import UserId
 
 
 async def list_articles(
@@ -34,10 +36,13 @@ async def list_articles(
             image_cte.c.image
         )
         .select_from(Article)
-        .join(ArticleTag, Article.id==ArticleTag.article_id)
-        .join(Tag, Tag.id==ArticleTag.tag_id)
-        .join(rating_cte, Article.id==rating_cte.c.rating_article_id)
-        .join(image_cte, Article.id==image_cte.c.image_article_id)
+
+        # TODO: inner join for images
+    
+        .join(ArticleTag, Article.id==ArticleTag.article_id, isouter=True)
+        .join(Tag, Tag.id==ArticleTag.tag_id, isouter=True)
+        .join(rating_cte, Article.id==rating_cte.c.rating_article_id, isouter=True)
+        .join(image_cte, Article.id==image_cte.c.image_article_id, isouter=True)
         .group_by(
             Article.id,
             rating_cte.c.average_rating,
@@ -68,10 +73,10 @@ async def article_detail(
             sa.func.array_agg(sa.func.distinct(Tag.name)).label("tags"),
         )
         .select_from(Article)
-        .join(rating_cte, Article.id==rating_cte.c.article_id)
-        .join(ArticleImage, Article.id==ArticleImage.article_id)
-        .join(ArticleTag, Article.id==ArticleTag.article_id)
-        .join(Tag, ArticleTag.tag_id==Tag.id)
+        .join(rating_cte, Article.id==rating_cte.c.article_id, isouter=True)
+        .join(ArticleImage, Article.id==ArticleImage.article_id, isouter=True)
+        .join(ArticleTag, Article.id==ArticleTag.article_id, isouter=True)
+        .join(Tag, ArticleTag.tag_id==Tag.id, isouter=True)
         .group_by(
             Article.id,
             Article.title,
@@ -89,3 +94,21 @@ async def article_detail(
     else:
         raise exceptions.ArticleNotFound
 
+
+async def rating_article(
+        session: async_sessionmaker[AsyncSession],
+        article_id: ArticleId,
+        user_id: UserId,
+        rating: int
+) -> None:
+    query = postgres_insert(Rating).values({
+        Rating.rating: rating,
+        Rating.user_id: user_id,
+        Rating.article_id: article_id
+    })
+    do_update_stmt = query.on_conflict_do_update(
+        constraint="uq_ratings_user_id",
+        set_={Rating.rating: rating}
+    )
+    async with session.begin() as conn:
+        await conn.execute(do_update_stmt)

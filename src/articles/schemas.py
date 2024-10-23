@@ -1,4 +1,4 @@
-from pydantic import Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Annotated
 from datetime import datetime
 from decimal import Decimal
@@ -14,7 +14,10 @@ class ArticleBase(CustomBaseModel):
     title: Annotated[str, Field(max_length=200)]
     description: str
     tags: list[str]
-    average_rating: Annotated[Decimal, Field(ge=0, le=5)]
+    average_rating: Annotated[
+        Decimal | None,
+        Field(ge=0, le=5, alias="averageRating")
+    ] = Decimal(0)
     views: int
     created_at: Annotated[datetime, Field(alias="createdAt")]
 
@@ -45,3 +48,7 @@ class ArticleDetail(ArticleBase):
         for image in images:
             images_list.append(f"{storage_config.S3_API}/{image}")
         return images_list
+
+
+class RatingIn(BaseModel):
+    rating: Annotated[int, Field(ge=0, le=5)]

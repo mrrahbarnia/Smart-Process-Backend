@@ -7,6 +7,9 @@ from src.pagination import PaginatedResponse, PaginationQuerySchema, pagination_
 from src.articles import schemas
 from src.articles import service
 from src.articles.types import ArticleId
+from src.auth.models import User
+from src.auth.dependencies import get_current_active_user
+
 
 router = APIRouter()
 
@@ -42,4 +45,21 @@ async def article_detail(
         session=session
     )
     return result
-    
+
+
+@router.put(
+    "/article-rating/{article_id}/",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def rating_article(
+    article_id: ArticleId,
+    payload: schemas.RatingIn,
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+    user: Annotated[User, Depends(get_current_active_user)]
+) -> None:
+    await service.rating_article(
+        rating=payload.rating,
+        session=session,
+        article_id=article_id,
+        user_id=user.id
+    )

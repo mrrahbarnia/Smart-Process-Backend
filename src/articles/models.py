@@ -76,6 +76,7 @@ class Rating(Base):
     __tablename__ = "ratings"
     __table_args__ = (
         sa.CheckConstraint("rating BETWEEN 0 AND 5", name="check_rating_limit"),
+        sa.UniqueConstraint("user_id", "article_id")
     )
     id: so.Mapped[types.RatingId] = so.mapped_column(
         primary_key=True, autoincrement=True
