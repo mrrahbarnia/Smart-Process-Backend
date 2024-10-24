@@ -34,8 +34,9 @@ from src.products.models import (
 from src.s3.utils import upload_to_s3, delete_from_s3
 from src.tickets.models import Ticket
 from src.tickets.types import TicketId
-from src.articles.models import Tag
-from src.articles.types import TagId
+from src.articles.models import Tag, ArticleTag
+from src.articles.types import TagId, ArticleId
+from src.articles.exceptions import ArticleNotFound
 
 logger = logging.getLogger("admin")
 
@@ -728,7 +729,6 @@ async def delete_ticket(
     if result is None:
         raise exceptions.TicketNotFound
 
-
 # ==================== Tag service ==================== #
 
 async def create_tag(
@@ -775,3 +775,33 @@ async def delete_tag(
         result: TagId | None = await conn.scalar(query)
     if result is None:
         raise exceptions.TagNotFound
+
+# ==================== ArticleTag service ==================== #
+
+async def assign_tags_to_article(
+        article_id: ArticleId,
+        session: async_sessionmaker[AsyncSession],
+        tag_name: str
+) -> None:
+    tag_query = sa.select(Tag.id).where(Tag.name==tag_name)
+    try:
+        async with session.begin() as conn:
+            tag_result: TagId | None = await conn.scalar(tag_query)
+            if tag_result is None:
+                raise exceptions.TagNotFound
+            query = sa.insert(ArticleTag).values(
+                {
+                    ArticleTag.article_id: article_id,
+                    ArticleTag.tag_id: tag_result
+                }
+            )
+            await conn.execute(query)
+
+    except IntegrityError as ex:
+        logger.warning(ex)
+
+        if "pk_article_tags" in str(ex):
+            raise exceptions.DuplicateArticleTagPk
+
+        if "fk_article_tags_article_id_articles" in str(ex):
+            raise ArticleNotFound

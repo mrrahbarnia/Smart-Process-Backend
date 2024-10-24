@@ -31,50 +31,37 @@ class LogConfig(BaseModel):
     disable_existing_loggers: bool = False
     formatters: dict = {
         "console": {
-            "format": '%(asctime)s %(levelname)s %(module)s %(message)s',
+            "format": '%(asctime)s %(levelname)s %(module)s %(process)d %(thread)d %(message)s',
             "class": "pythonjsonlogger.jsonlogger.JsonFormatter",
             "datefmt": "%Y-%m-%dT%H:%M:%SZ",
-        },
-        "file": {
-            'format': '%(asctime)s %(levelname)s %(module)s %(process)d %(thread)d %(message)s',
-            "class": "pythonjsonlogger.jsonlogger.JsonFormatter",
-            "datefmt": "%Y-%m-%dT%H:%M:%SZ",
-        },
+        }
     }
     handlers: dict = {
         'console': {
             'class': 'logging.StreamHandler',
             'level': 'DEBUG',
             'formatter': 'console',
-        },
-       'file': {
-            'level': 'WARNING',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': './logs/backend.log',
-            'maxBytes': 1024*1024*5,
-            'backupCount': 5,
-            'formatter': 'file',
-        },
+        }
     }
     loggers: dict = {
         'root': {
-            'handlers': ['file', 'console'],
+            'handlers': ['console'],
             'propagate': False,
         },
         'auth': {
-            'handlers': ['file', 'console'],
+            'handlers': ['console'],
             'propagate': False,
         },
         'payment': {
-            'handlers': ['file', 'console'],
+            'handlers': ['console'],
             'propagate': False,
         },
         'admin': {
-            'handlers': ['file', 'console'],
+            'handlers': ['console'],
             'propagate': False,
         },
         'tickets': {
-            'handlers': ['file', 'console'],
+            'handlers': ['console'],
             'propagate': False,
         }
     }

@@ -10,7 +10,7 @@ from src.admin import service
 from src.products.types import CategoryId, ProductId, SerialNumber, CommentId
 from src.auth.dependencies import is_admin
 from src.tickets.types import TicketId
-from src.articles.types import TagId
+from src.articles.types import TagId, ArticleId
 
 router = APIRouter()
 
@@ -524,3 +524,22 @@ async def delete_tag(
     await service.delete_tag(
         session=session, tag_id=tag_id
     )
+
+# ==================== ArticleTag routes ==================== #
+
+@router.post(
+    "/assign-tag/{article_id}/",
+    status_code=status.HTTP_200_OK
+)
+async def assign_tags_to_article(
+    is_admin: Annotated[bool, Depends(is_admin)],
+    payload: schemas.TagIn,
+    article_id: ArticleId,
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+) -> dict:
+    await service.assign_tags_to_article(
+        article_id=article_id,
+        session=session,
+        tag_name=payload.name
+    )
+    return {"detail": "Assigned successfully."}
