@@ -13,6 +13,7 @@ from src.auth.dependencies import get_current_active_user
 
 router = APIRouter()
 
+# ==================== Article routes ==================== #
 
 @router.get(
     "/list-articles/",
@@ -46,6 +47,7 @@ async def article_detail(
     )
     return result
 
+# ==================== Rating routes ==================== #
 
 @router.put(
     "/article-rating/{article_id}/",
@@ -63,3 +65,20 @@ async def rating_article(
         article_id=article_id,
         user_id=user.id
     )
+
+# ==================== Tag routes ==================== #
+
+@router.get(
+    "/search-tags/",
+    status_code=status.HTTP_200_OK,
+    response_model=list[str]
+)
+async def search_tag_by_name(
+    tag_name: str,
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)]
+) -> list[str]:
+    result = await service.search_tag_by_name(
+        session=session,
+        tag_name=tag_name
+    )
+    return result

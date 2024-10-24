@@ -46,7 +46,7 @@ class Tag(Base):
     id: so.Mapped[types.TagId] = so.mapped_column(
         primary_key=True, autoincrement=True
     )
-    name: so.Mapped[str] =  so.mapped_column(sa.String(200))
+    name: so.Mapped[str] =  so.mapped_column(sa.String(200), unique=True)
     created_at: so.Mapped[datetime] = so.mapped_column(
         sa.TIMESTAMP(timezone=True), server_default=sa.func.now()
     )

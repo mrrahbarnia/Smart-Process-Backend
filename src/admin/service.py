@@ -34,6 +34,8 @@ from src.products.models import (
 from src.s3.utils import upload_to_s3, delete_from_s3
 from src.tickets.models import Ticket
 from src.tickets.types import TicketId
+from src.articles.models import Tag
+from src.articles.types import TagId
 
 logger = logging.getLogger("admin")
 
@@ -725,3 +727,51 @@ async def delete_ticket(
         result: TicketId | None = await conn.scalar(query)
     if result is None:
         raise exceptions.TicketNotFound
+
+
+# ==================== Tag service ==================== #
+
+async def create_tag(
+        session: async_sessionmaker[AsyncSession],
+        payload: schemas.TagIn
+) -> None:
+    query = sa.insert(Tag).values(
+        {
+            Tag.name: payload.name
+        }
+    )
+    try:
+        async with session.begin() as conn:
+            await conn.execute(query)
+    except IntegrityError as ex:
+        if "uq_tags_name" in str(ex):
+            raise exceptions.DuplicateTagName
+
+
+async def list_tags(
+        engine: AsyncEngine,
+        limit: int,
+        offset: int,
+        name__contain: str | None
+) -> dict:
+    query = sa.select(Tag.id, Tag.name)
+    if name__contain:
+        query = query.where(Tag.name.ilike(f"%{name__contain}%"))
+    return await paginate(
+        query=query, engine=engine, limit=limit, offset=offset
+    )
+
+
+async def delete_tag(
+        tag_id: TagId,
+        session: async_sessionmaker[AsyncSession],
+) -> None:
+    query = (
+        sa.delete(Tag)
+        .where(Tag.id==tag_id)
+        .returning(Tag.id)
+    )
+    async with session.begin() as conn:
+        result: TagId | None = await conn.scalar(query)
+    if result is None:
+        raise exceptions.TagNotFound

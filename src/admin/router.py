@@ -10,6 +10,7 @@ from src.admin import service
 from src.products.types import CategoryId, ProductId, SerialNumber, CommentId
 from src.auth.dependencies import is_admin
 from src.tickets.types import TicketId
+from src.articles.types import TagId
 
 router = APIRouter()
 
@@ -232,7 +233,7 @@ async def list_attributes(
     is_admin: Annotated[bool, Depends(is_admin)],
     pagination_info: Annotated[PaginationQuerySchema, Depends(pagination_query)],
     name__contain: str | None = None,
-):
+) -> dict:
     result = await service.list_attributes(
         engine=engine,
         limit=pagination_info.limit,
@@ -474,4 +475,52 @@ async def delete_ticket(
     await service.delete_ticket(
         session=session,
         ticket_id=ticket_id
+    )
+
+# ==================== Tag routes ==================== #
+
+@router.post(
+    "/create-tag/",
+    status_code=status.HTTP_201_CREATED
+)
+async def create_tag(
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+    is_admin: Annotated[bool, Depends(is_admin)],
+    payload: schemas.TagIn
+):
+    await service.create_tag(session=session, payload=payload)
+    return {"detail": "Created successfully."}
+
+
+@router.get(
+    "/list-tags/",
+    status_code=status.HTTP_200_OK,
+    response_model=PaginatedResponse[schemas.TagList]
+)
+async def list_tags(
+    engine: Annotated[AsyncEngine, Depends(get_engine)],
+    is_admin: Annotated[bool, Depends(is_admin)],
+    pagination_info: Annotated[PaginationQuerySchema, Depends(pagination_query)],
+    name__contain: str | None = None,
+) -> dict:
+    result = await service.list_tags(
+        engine=engine,
+        limit=pagination_info.limit,
+        offset=pagination_info.offset,
+        name__contain=name__contain
+    )
+    return result
+
+
+@router.delete(
+    "/delete-tag/{tag_id}/",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_tag(
+    tag_id: TagId,
+    is_admin: Annotated[bool, Depends(is_admin)],
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+):
+    await service.delete_tag(
+        session=session, tag_id=tag_id
     )

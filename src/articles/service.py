@@ -1,5 +1,4 @@
 import sqlalchemy as sa
-import sqlalchemy.orm as so
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
@@ -10,6 +9,7 @@ from src.articles.models import Article, Rating, Tag, ArticleTag, ArticleImage
 from src.articles.types import ArticleId
 from src.auth.types import UserId
 
+# ==================== Article service ==================== #
 
 async def list_articles(
         engine: AsyncEngine,
@@ -94,6 +94,7 @@ async def article_detail(
     else:
         raise exceptions.ArticleNotFound
 
+# ==================== Rating service ==================== #
 
 async def rating_article(
         session: async_sessionmaker[AsyncSession],
@@ -112,3 +113,14 @@ async def rating_article(
     )
     async with session.begin() as conn:
         await conn.execute(do_update_stmt)
+
+# ==================== Rating service ==================== #
+
+async def search_tag_by_name(
+        session: async_sessionmaker[AsyncSession],
+        tag_name: str
+) -> list[str]:
+    query = sa.select(Tag.name).where(Tag.name.ilike(f"%{tag_name}%"))
+    async with session.begin() as conn:
+        result = (await conn.scalars(query)).all()
+    return [tag for tag in result]

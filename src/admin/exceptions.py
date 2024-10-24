@@ -108,3 +108,15 @@ class TicketNotFound(HTTPException):
     def __init__(self) -> None:
         self.status_code = status.HTTP_404_NOT_FOUND
         self.detail = "There is no ticket with the provided info!"
+
+
+class DuplicateTagName(HTTPException):
+    def __init__(self) -> None:
+        self.status_code = status.HTTP_409_CONFLICT
+        self.detail = "Unique name for tags!"
+
+
+class TagNotFound(HTTPException):
+    def __init__(self) -> None:
+        self.status_code = status.HTTP_404_NOT_FOUND
+        self.detail = "There is no tag with the provided info!"
