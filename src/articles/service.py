@@ -1,5 +1,7 @@
 import sqlalchemy as sa
+import json
 
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
 
@@ -9,27 +11,29 @@ from src.articles.models import Article, Rating, Tag, ArticleTag, ArticleImage
 from src.articles.types import ArticleId
 from src.auth.types import UserId
 
+rating_cte = sa.select(
+    Rating.article_id.label("rating_article_id"),
+    sa.func.avg(Rating.rating).label("average_rating")
+).group_by(Rating.article_id).cte()
+
+image_cte = sa.select(
+    ArticleImage.article_id.label("image_article_id"),
+    (sa.func.min(ArticleImage.url)).label("image")
+).group_by(ArticleImage.article_id).cte()
+
 # ==================== Article service ==================== #
 
 async def list_articles(
         engine: AsyncEngine,
         limit: int,
         offset: int
-):
-    image_cte = sa.select(
-        ArticleImage.article_id.label("image_article_id"),
-        (sa.func.min(ArticleImage.url)).label("image")
-    ).group_by(ArticleImage.article_id).cte()
-    rating_cte = sa.select(
-        Rating.article_id.label("rating_article_id"),
-        sa.func.avg(Rating.rating).label("average_rating")
-    ).group_by(Rating.article_id).cte()
+) -> dict:
+    
     query = (
         sa.select(
             Article.id,
             Article.title,
             Article.description,
-            Article.views,
             Article.created_at,
             rating_cte.c.average_rating,
             sa.func.array_agg(Tag.name).label("tags"),
@@ -47,7 +51,7 @@ async def list_articles(
             Article.id,
             rating_cte.c.average_rating,
             image_cte.c.image
-        )
+        ).order_by(Article.created_at.desc())
     )
     result = await paginate(engine=engine, query=query, limit=limit, offset=offset)
     return result
@@ -56,11 +60,7 @@ async def list_articles(
 async def article_detail(
         session: async_sessionmaker[AsyncSession],
         article_id: ArticleId
-):
-    rating_cte = sa.select(
-        Rating.article_id,
-        sa.func.avg(Rating.rating).label("average_rating")
-    ).group_by(Rating.article_id).cte()
+) -> dict:
     query = (
         sa.select(
             Article.id,
@@ -73,7 +73,7 @@ async def article_detail(
             sa.func.array_agg(sa.func.distinct(Tag.name)).label("tags"),
         )
         .select_from(Article)
-        .join(rating_cte, Article.id==rating_cte.c.article_id, isouter=True)
+        .join(rating_cte, Article.id==rating_cte.c.rating_article_id, isouter=True)
         .join(ArticleImage, Article.id==ArticleImage.article_id, isouter=True)
         .join(ArticleTag, Article.id==ArticleTag.article_id, isouter=True)
         .join(Tag, ArticleTag.tag_id==Tag.id, isouter=True)
@@ -87,12 +87,93 @@ async def article_detail(
         )
         .where(Article.id==article_id)
     )
+    update_views_query = sa.update(Article).values(
+        {
+            Article.views: Article.views + 1
+        }
+    ).where(Article.id==article_id)
     async with session.begin() as conn:
         result = (await conn.execute(query)).first()
+        await conn.execute(update_views_query)
     if result is not None:
         return result._asdict()
     else:
         raise exceptions.ArticleNotFound
+
+
+async def popular_articles(
+        session: async_sessionmaker[AsyncSession],
+        redis: Redis
+):
+    if cached_data := await redis.get(name="popular_articles"):
+        return json.loads(cached_data)
+    query = (
+        sa.select(
+            Article.id,
+            Article.title,
+            rating_cte.c.average_rating,
+            image_cte.c.image
+        )
+        .select_from(Article)
+        .join(rating_cte, Article.id==rating_cte.c.rating_article_id, isouter=True)
+        .join(image_cte, Article.id==image_cte.c.image_article_id)
+        .order_by(rating_cte.c.average_rating.desc())
+        .limit(10)
+    )
+    async with session.begin() as conn:
+        result = await conn.execute(query)
+        articles = result.fetchall()
+    articles_list = [
+        {
+            "id": str(article.id),
+            "title": article.title,
+            "average_rating": str(article.average_rating),
+            "image": article.image
+        } for article in articles
+    ]
+    await redis.set(
+        name="popular_articles",
+        value=json.dumps(articles_list),
+        ex=180   
+    )
+    return articles
+
+
+async def most_viewed_articles(
+        session: async_sessionmaker[AsyncSession],
+        redis: Redis
+):
+    if cached_data := await redis.get(name="most_viewed_articles"):
+        return json.loads(cached_data)
+    query = (
+        sa.select(
+            Article.id,
+            Article.title,
+            Article.views,
+            image_cte.c.image
+        )
+        .select_from(Article)
+        .join(image_cte, Article.id==image_cte.c.image_article_id)
+        .order_by(Article.views.desc())
+        .limit(10)
+    )
+    async with session.begin() as conn:
+        result = await conn.execute(query)
+        articles = result.fetchall()
+    articles_list = [
+        {
+            "id": str(article.id),
+            "title": article.title,
+            "views": str(article.views),
+            "image": article.image
+        } for article in articles
+    ]
+    await redis.set(
+        name="most_viewed_articles",
+        value=json.dumps(articles_list),
+        ex=180   
+    )
+    return articles
 
 # ==================== Rating service ==================== #
 

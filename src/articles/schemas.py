@@ -12,18 +12,40 @@ from src.s3.config import storage_config
 class ArticleBase(CustomBaseModel):
     id: ArticleId
     title: Annotated[str, Field(max_length=200)]
+    
+
+class ArticlePopular(ArticleBase):
+    image: str
+    average_rating: Annotated[
+        Decimal | None,
+        Field(ge=0, le=5, alias="averageRating")
+    ] = Decimal(0)
+
+    @field_validator("image", mode="after")
+    @classmethod
+    def set_image_url(cls, image: str) -> str:
+        return f"{storage_config.S3_API}/{image}"
+
+
+class ArticleMostViewed(ArticleBase):
+    image: str
+    views: int
+
+    @field_validator("image", mode="after")
+    @classmethod
+    def set_image_url(cls, image: str) -> str:
+        return f"{storage_config.S3_API}/{image}"
+
+
+class ArticlesList(ArticleBase):
     description: str
     tags: list[str]
     average_rating: Annotated[
         Decimal | None,
         Field(ge=0, le=5, alias="averageRating")
     ] = Decimal(0)
-    views: int
-    created_at: Annotated[datetime, Field(alias="createdAt")]
-
-
-class ArticlesList(ArticleBase):
     image: str
+    created_at: Annotated[datetime, Field(alias="createdAt")]
 
     @field_validator("description", mode="after")
     @classmethod
@@ -39,7 +61,15 @@ class ArticlesList(ArticleBase):
 
 
 class ArticleDetail(ArticleBase):
+    description: str
+    tags: list[str]
+    average_rating: Annotated[
+        Decimal | None,
+        Field(ge=0, le=5, alias="averageRating")
+    ] = Decimal(0)
+    views: int
     images: list[str]
+    created_at: Annotated[datetime, Field(alias="createdAt")]
 
     @field_validator("images", mode="after")
     @classmethod

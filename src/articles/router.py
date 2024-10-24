@@ -1,8 +1,9 @@
+from redis.asyncio import Redis
 from fastapi import APIRouter, Depends, status
 from typing import Annotated
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, AsyncEngine
 
-from src.database import get_session
+from src.database import get_session, get_redis
 from src.pagination import PaginatedResponse, PaginationQuerySchema, pagination_query
 from src.articles import schemas
 from src.articles import service
@@ -44,6 +45,37 @@ async def article_detail(
     result = await service.article_detail(
         article_id=article_id,
         session=session
+    )
+    return result
+
+@router.get(
+    "/popular-articles/",
+    response_model=list[schemas.ArticlePopular],
+    status_code=status.HTTP_200_OK
+)
+async def popular_articles(
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+    redis: Annotated[Redis, Depends(get_redis)]
+):
+    result = await service.popular_articles(
+        session=session,
+        redis=redis
+    )
+    return result
+
+
+@router.get(
+    "/most-viewed-articles/",
+    response_model=list[schemas.ArticleMostViewed],
+    status_code=status.HTTP_200_OK
+)
+async def most_viewed_articles(
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+    redis: Annotated[Redis, Depends(get_redis)]
+):
+    result = await service.most_viewed_articles(
+        session=session,
+        redis=redis
     )
     return result
 
