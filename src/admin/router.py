@@ -543,3 +543,37 @@ async def assign_tags_to_article(
         tag_name=payload.name
     )
     return {"detail": "Assigned successfully."}
+
+
+@router.put(
+        "/update-tag/{tag_id}/",
+        status_code=status.HTTP_204_NO_CONTENT
+)
+async def update_tag(
+    is_admin: Annotated[bool, Depends(is_admin)],
+    tag_id: TagId,
+    payload: schemas.TagIn,
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+) -> None:
+    await service.update_tag(
+        tag_id=tag_id,
+        session=session,
+        tag_name=payload.name
+    )
+
+
+@router.delete(
+    "/unassign-tag/{article_id}/",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def unassign_tags_to_article(
+    is_admin: Annotated[bool, Depends(is_admin)],
+    payload: schemas.TagIn,
+    article_id: ArticleId,
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+):
+    await service.unassign_tags_to_article(
+        article_id=article_id,
+        session=session,
+        tag_name=payload.name
+    )

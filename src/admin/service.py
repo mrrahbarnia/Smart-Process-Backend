@@ -776,6 +776,24 @@ async def delete_tag(
     if result is None:
         raise exceptions.TagNotFound
 
+
+async def update_tag(
+        tag_id: TagId,
+        session: async_sessionmaker[AsyncSession],
+        tag_name: str
+) -> None:
+    query = (
+        sa.update(Tag)
+        .values(
+        {
+            Tag.name: tag_name
+        }
+        )
+        .where(Tag.id==tag_id)
+    )
+    async with session.begin() as conn:
+        await conn.execute(query)
+
 # ==================== ArticleTag service ==================== #
 
 async def assign_tags_to_article(
@@ -805,3 +823,26 @@ async def assign_tags_to_article(
 
         if "fk_article_tags_article_id_articles" in str(ex):
             raise ArticleNotFound
+
+
+async def unassign_tags_to_article(
+        article_id: ArticleId,
+        session: async_sessionmaker[AsyncSession],
+        tag_name: str
+) -> None:
+    tag_query = sa.select(Tag.id).where(Tag.name==tag_name)
+    try:
+        async with session.begin() as conn:
+            tag_result: TagId | None = await conn.scalar(tag_query)
+            if tag_result is None:
+                raise exceptions.TagNotFound
+            query = sa.delete(ArticleTag).where(
+                sa.and_(
+                    ArticleTag.article_id==article_id,
+                    ArticleTag.tag_id==tag_result
+                )
+            )
+            await conn.execute(query)
+
+    except IntegrityError as ex:
+        logger.warning(ex)
