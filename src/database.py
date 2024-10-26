@@ -42,7 +42,6 @@ class Base(MappedAsDataclass, DeclarativeBase):
         ticket_types.TicketId: INTEGER,
         article_types.ArticleId: UUID,
         article_types.ArticleImageId: INTEGER,
-        article_types.TagId: INTEGER,
         article_types.RatingId: INTEGER,
         article_types.ArticleCommentId: INTEGER
     }

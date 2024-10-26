@@ -18,7 +18,6 @@ from src.products import types as product_types
 from src.s3.config import storage_config
 from src.tickets.schemas import TicketIn
 from src.tickets.types import TicketId
-from src.articles.types import TagId
 
 
 class Brand(BaseModel):
@@ -140,9 +139,9 @@ class TicketList(TicketIn):
     id: TicketId
 
 
-class TagIn(BaseModel):
+class Tag(BaseModel):
     name: Annotated[str, Field(max_length=200)]
 
 
-class TagList(TagIn):
-    id: TagId
+# class TagList(TagIn):
+#     id: TagId

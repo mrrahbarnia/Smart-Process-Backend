@@ -24,7 +24,7 @@ class Article(Base):
 
     def __repr__(self) -> str:
         return f"{self.id}"
-    
+
 
 class ArticleImage(Base):
     __tablename__ = "article_images"
@@ -39,37 +39,34 @@ class ArticleImage(Base):
 
     def __repr__(self) -> str:
         return f"{self.id}"
-    
+
 
 class Tag(Base):
     __tablename__ = "tags"
-    id: so.Mapped[types.TagId] = so.mapped_column(
-        primary_key=True, autoincrement=True
-    )
-    name: so.Mapped[str] =  so.mapped_column(sa.String(200), unique=True)
+    name: so.Mapped[str] =  so.mapped_column(primary_key=True)
     created_at: so.Mapped[datetime] = so.mapped_column(
         sa.TIMESTAMP(timezone=True), server_default=sa.func.now()
     )
 
     def __repr__(self) -> str:
-        return f"{self.id}"
+        return f"{self.name}"
 
 
 class ArticleTag(Base):
     __tablename__ = "article_tags"
     __table_args__ = (
-        sa.PrimaryKeyConstraint("article_id", "tag_id"),
+        sa.PrimaryKeyConstraint("article_id", "tag_name"),
     )
 
     article_id: so.Mapped[types.ArticleId] = so.mapped_column(
         sa.ForeignKey(f"{Article.__tablename__}.id", ondelete="CASCADE")
     )
-    tag_id: so.Mapped[types.TagId] = so.mapped_column(
-        sa.ForeignKey(f"{Tag.__tablename__}.id", ondelete="CASCADE")
+    tag_name: so.Mapped[str] = so.mapped_column(
+        sa.ForeignKey(f"{Tag.__tablename__}.name", ondelete="CASCADE")
     )
 
     def __repr__(self) -> str:
-        return f"article_id: {self.article_id}, tag_id: {self.tag_id}"
+        return f"article_id: {self.article_id}, tag_name: {self.tag_name}"
 
 
 class Rating(Base):

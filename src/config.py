@@ -63,6 +63,14 @@ class LogConfig(BaseModel):
         'tickets': {
             'handlers': ['console'],
             'propagate': False,
+        },
+        'articles': {
+            'handlers': ['console'],
+            'propagate': False,
+        },
+        'pagination': {
+            'handlers': ['console'],
+            'propagate': False,
         }
     }
 

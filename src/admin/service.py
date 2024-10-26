@@ -35,7 +35,7 @@ from src.s3.utils import upload_to_s3, delete_from_s3
 from src.tickets.models import Ticket
 from src.tickets.types import TicketId
 from src.articles.models import Tag, ArticleTag
-from src.articles.types import TagId, ArticleId
+from src.articles.types import ArticleId
 from src.articles.exceptions import ArticleNotFound
 
 logger = logging.getLogger("admin")
@@ -733,7 +733,7 @@ async def delete_ticket(
 
 async def create_tag(
         session: async_sessionmaker[AsyncSession],
-        payload: schemas.TagIn
+        payload: schemas.Tag
 ) -> None:
     query = sa.insert(Tag).values(
         {
@@ -744,7 +744,8 @@ async def create_tag(
         async with session.begin() as conn:
             await conn.execute(query)
     except IntegrityError as ex:
-        if "uq_tags_name" in str(ex):
+        logger.warning(ex)
+        if "pk_tags" in str(ex):
             raise exceptions.DuplicateTagName
 
 
@@ -754,7 +755,7 @@ async def list_tags(
         offset: int,
         name__contain: str | None
 ) -> dict:
-    query = sa.select(Tag.id, Tag.name)
+    query = sa.select(Tag.name)
     if name__contain:
         query = query.where(Tag.name.ilike(f"%{name__contain}%"))
     return await paginate(
@@ -763,36 +764,55 @@ async def list_tags(
 
 
 async def delete_tag(
-        tag_id: TagId,
+        tag_name: str,
         session: async_sessionmaker[AsyncSession],
 ) -> None:
     query = (
         sa.delete(Tag)
-        .where(Tag.id==tag_id)
-        .returning(Tag.id)
+        .where(Tag.name==tag_name)
+        .returning(Tag.name)
     )
-    async with session.begin() as conn:
-        result: TagId | None = await conn.scalar(query)
-    if result is None:
-        raise exceptions.TagNotFound
+    try:
+        async with session.begin() as conn:
+            result: str | None = await conn.scalar(query)
+            if result is None:
+                raise exceptions.TagNotFound
+
+    except exceptions.TagNotFound as ex:
+        logger.warning(ex)
+        raise ex
+
+    except IntegrityError as ex:
+        logger.warning(ex)
 
 
 async def update_tag(
-        tag_id: TagId,
+        tag_name: str,
         session: async_sessionmaker[AsyncSession],
-        tag_name: str
+        new_name: str
 ) -> None:
     query = (
         sa.update(Tag)
         .values(
         {
-            Tag.name: tag_name
+            Tag.name: new_name
         }
         )
-        .where(Tag.id==tag_id)
+        .where(Tag.name==tag_name)
+        .returning(Tag.name)
     )
-    async with session.begin() as conn:
-        await conn.execute(query)
+    try:
+        async with session.begin() as conn:
+            result: str | None = await conn.scalar(query)
+            if result is None:
+                raise exceptions.TagNotFound
+
+    except exceptions.TagNotFound as ex:
+        logger.warning(ex)
+        raise ex
+
+    except IntegrityError as ex:
+        logger.warning(ex)
 
 # ==================== ArticleTag service ==================== #
 
@@ -801,19 +821,23 @@ async def assign_tags_to_article(
         session: async_sessionmaker[AsyncSession],
         tag_name: str
 ) -> None:
-    tag_query = sa.select(Tag.id).where(Tag.name==tag_name)
+    tag_query = sa.select(Tag.name).where(Tag.name==tag_name)
     try:
         async with session.begin() as conn:
-            tag_result: TagId | None = await conn.scalar(tag_query)
+            tag_result: str | None = await conn.scalar(tag_query)
             if tag_result is None:
                 raise exceptions.TagNotFound
             query = sa.insert(ArticleTag).values(
                 {
                     ArticleTag.article_id: article_id,
-                    ArticleTag.tag_id: tag_result
+                    ArticleTag.tag_name: tag_result
                 }
             )
             await conn.execute(query)
+    
+    except exceptions.TagNotFound as ex:
+        logger.warning(ex)
+        raise ex
 
     except IntegrityError as ex:
         logger.warning(ex)
@@ -830,19 +854,23 @@ async def unassign_tags_to_article(
         session: async_sessionmaker[AsyncSession],
         tag_name: str
 ) -> None:
-    tag_query = sa.select(Tag.id).where(Tag.name==tag_name)
+    tag_query = sa.select(Tag.name).where(Tag.name==tag_name)
     try:
         async with session.begin() as conn:
-            tag_result: TagId | None = await conn.scalar(tag_query)
+            tag_result: str | None = await conn.scalar(tag_query)
             if tag_result is None:
                 raise exceptions.TagNotFound
             query = sa.delete(ArticleTag).where(
                 sa.and_(
                     ArticleTag.article_id==article_id,
-                    ArticleTag.tag_id==tag_result
+                    ArticleTag.tag_name==tag_result
                 )
             )
             await conn.execute(query)
+
+    except exceptions.TagNotFound as ex:
+        logger.warning(ex)
+        raise ex
 
     except IntegrityError as ex:
         logger.warning(ex)

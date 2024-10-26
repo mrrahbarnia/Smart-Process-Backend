@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 85cf02d99a20
+Revision ID: 1d82635ea530
 Revises: 
-Create Date: 2024-10-24 09:48:17.209270
+Create Date: 2024-10-26 12:54:33.006390
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '85cf02d99a20'
+revision: str = '1d82635ea530'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -70,11 +70,9 @@ def upgrade() -> None:
     sa.UniqueConstraint('guaranty_serial', name=op.f('uq_guaranties_guaranty_serial'))
     )
     op.create_table('tags',
-    sa.Column('id', sa.INTEGER(), autoincrement=True, nullable=False),
-    sa.Column('name', sa.String(length=200), nullable=False),
+    sa.Column('name', sa.String(), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.PrimaryKeyConstraint('id', name=op.f('pk_tags')),
-    sa.UniqueConstraint('name', name=op.f('uq_tags_name'))
+    sa.PrimaryKeyConstraint('name', name=op.f('pk_tags'))
     )
     op.create_table('tickets',
     sa.Column('id', sa.INTEGER(), autoincrement=True, nullable=False),
@@ -130,10 +128,10 @@ def upgrade() -> None:
     )
     op.create_table('article_tags',
     sa.Column('article_id', sa.UUID(), nullable=False),
-    sa.Column('tag_id', sa.INTEGER(), nullable=False),
+    sa.Column('tag_name', sa.String(), nullable=False),
     sa.ForeignKeyConstraint(['article_id'], ['articles.id'], name=op.f('fk_article_tags_article_id_articles'), ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tag_id'], ['tags.id'], name=op.f('fk_article_tags_tag_id_tags'), ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('article_id', 'tag_id', name=op.f('pk_article_tags'))
+    sa.ForeignKeyConstraint(['tag_name'], ['tags.name'], name=op.f('fk_article_tags_tag_name_tags'), ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('article_id', 'tag_name', name=op.f('pk_article_tags'))
     )
     op.create_table('carts',
     sa.Column('id', sa.INTEGER(), autoincrement=True, nullable=False),

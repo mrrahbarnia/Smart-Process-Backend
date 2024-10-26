@@ -10,7 +10,7 @@ from src.admin import service
 from src.products.types import CategoryId, ProductId, SerialNumber, CommentId
 from src.auth.dependencies import is_admin
 from src.tickets.types import TicketId
-from src.articles.types import TagId, ArticleId
+from src.articles.types import ArticleId
 
 router = APIRouter()
 
@@ -486,7 +486,7 @@ async def delete_ticket(
 async def create_tag(
     session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
     is_admin: Annotated[bool, Depends(is_admin)],
-    payload: schemas.TagIn
+    payload: schemas.Tag
 ):
     await service.create_tag(session=session, payload=payload)
     return {"detail": "Created successfully."}
@@ -495,7 +495,7 @@ async def create_tag(
 @router.get(
     "/list-tags/",
     status_code=status.HTTP_200_OK,
-    response_model=PaginatedResponse[schemas.TagList]
+    response_model=PaginatedResponse[schemas.Tag]
 )
 async def list_tags(
     engine: Annotated[AsyncEngine, Depends(get_engine)],
@@ -513,16 +513,33 @@ async def list_tags(
 
 
 @router.delete(
-    "/delete-tag/{tag_id}/",
+    "/delete-tag/{tag_name}/",
     status_code=status.HTTP_204_NO_CONTENT
 )
 async def delete_tag(
-    tag_id: TagId,
+    tag_name: str,
     is_admin: Annotated[bool, Depends(is_admin)],
     session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
 ):
     await service.delete_tag(
-        session=session, tag_id=tag_id
+        session=session, tag_name=tag_name
+    )
+
+
+@router.put(
+        "/update-tag/{tag_name}/",
+        status_code=status.HTTP_204_NO_CONTENT
+)
+async def update_tag(
+    is_admin: Annotated[bool, Depends(is_admin)],
+    tag_name: str,
+    payload: schemas.Tag,
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+) -> None:
+    await service.update_tag(
+        tag_name=tag_name,
+        session=session,
+        new_name=payload.name
     )
 
 # ==================== ArticleTag routes ==================== #
@@ -533,7 +550,7 @@ async def delete_tag(
 )
 async def assign_tags_to_article(
     is_admin: Annotated[bool, Depends(is_admin)],
-    payload: schemas.TagIn,
+    payload: schemas.Tag,
     article_id: ArticleId,
     session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
 ) -> dict:
@@ -545,30 +562,13 @@ async def assign_tags_to_article(
     return {"detail": "Assigned successfully."}
 
 
-@router.put(
-        "/update-tag/{tag_id}/",
-        status_code=status.HTTP_204_NO_CONTENT
-)
-async def update_tag(
-    is_admin: Annotated[bool, Depends(is_admin)],
-    tag_id: TagId,
-    payload: schemas.TagIn,
-    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
-) -> None:
-    await service.update_tag(
-        tag_id=tag_id,
-        session=session,
-        tag_name=payload.name
-    )
-
-
 @router.delete(
     "/unassign-tag/{article_id}/",
     status_code=status.HTTP_204_NO_CONTENT
 )
 async def unassign_tags_to_article(
     is_admin: Annotated[bool, Depends(is_admin)],
-    payload: schemas.TagIn,
+    payload: schemas.Tag,
     article_id: ArticleId,
     session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
 ):

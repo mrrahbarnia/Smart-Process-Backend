@@ -1,8 +1,10 @@
+import logging
 import sqlalchemy as sa
 import json
 
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
 
 from src.pagination import paginate
@@ -10,6 +12,8 @@ from src.articles import exceptions
 from src.articles.models import Article, Rating, Tag, ArticleTag, ArticleImage
 from src.articles.types import ArticleId
 from src.auth.types import UserId
+
+logger = logging.getLogger("articles")
 
 rating_cte = sa.select(
     Rating.article_id.label("rating_article_id"),
@@ -27,7 +31,7 @@ async def list_articles(
         engine: AsyncEngine,
         limit: int,
         offset: int
-) -> dict:
+) -> dict | None:
     
     query = (
         sa.select(
@@ -44,7 +48,7 @@ async def list_articles(
         # TODO: inner join for images
     
         .join(ArticleTag, Article.id==ArticleTag.article_id, isouter=True)
-        .join(Tag, Tag.id==ArticleTag.tag_id, isouter=True)
+        .join(Tag, Tag.name==ArticleTag.tag_name, isouter=True)
         .join(rating_cte, Article.id==rating_cte.c.rating_article_id, isouter=True)
         .join(image_cte, Article.id==image_cte.c.image_article_id, isouter=True)
         .group_by(
@@ -54,13 +58,15 @@ async def list_articles(
         ).order_by(Article.created_at.desc())
     )
     result = await paginate(engine=engine, query=query, limit=limit, offset=offset)
-    return result
+    if result:
+        return result
+    return None
 
 
 async def article_detail(
         session: async_sessionmaker[AsyncSession],
         article_id: ArticleId
-) -> dict:
+) -> dict | None:
     query = (
         sa.select(
             Article.id,
@@ -76,7 +82,7 @@ async def article_detail(
         .join(rating_cte, Article.id==rating_cte.c.rating_article_id, isouter=True)
         .join(ArticleImage, Article.id==ArticleImage.article_id, isouter=True)
         .join(ArticleTag, Article.id==ArticleTag.article_id, isouter=True)
-        .join(Tag, ArticleTag.tag_id==Tag.id, isouter=True)
+        .join(Tag, ArticleTag.tag_name==Tag.name, isouter=True)
         .group_by(
             Article.id,
             Article.title,
@@ -92,13 +98,22 @@ async def article_detail(
             Article.views: Article.views + 1
         }
     ).where(Article.id==article_id)
-    async with session.begin() as conn:
-        result = (await conn.execute(query)).first()
-        await conn.execute(update_views_query)
-    if result is not None:
-        return result._asdict()
-    else:
-        raise exceptions.ArticleNotFound
+    try:
+        async with session.begin() as conn:
+            result = (await conn.execute(query)).first()
+            await conn.execute(update_views_query)
+            if result is not None:
+                return result._asdict()
+            else:
+                raise exceptions.ArticleNotFound
+    
+    except exceptions.ArticleNotFound as ex:
+        logger.info(ex)
+        return None
+
+    except IntegrityError as ex:
+        logger.warning(ex)
+        return None
 
 
 async def popular_articles(
@@ -192,10 +207,13 @@ async def rating_article(
         constraint="uq_ratings_user_id",
         set_={Rating.rating: rating}
     )
-    async with session.begin() as conn:
-        await conn.execute(do_update_stmt)
+    try:
+        async with session.begin() as conn:
+            await conn.execute(do_update_stmt)
+    except Exception as ex:
+        logger.warning(ex)
 
-# ==================== Rating service ==================== #
+# ==================== Tag service ==================== #
 
 async def search_tag_by_name(
         session: async_sessionmaker[AsyncSession],
@@ -204,4 +222,5 @@ async def search_tag_by_name(
     query = sa.select(Tag.name).where(Tag.name.ilike(f"%{tag_name}%"))
     async with session.begin() as conn:
         result = (await conn.scalars(query)).all()
-    return [tag for tag in result]
+        return [tag for tag in result]
+    

@@ -1,3 +1,5 @@
+from typing import Any
+import logging
 import sqlalchemy as sa
 
 from fastapi import Query
@@ -6,6 +8,8 @@ from pydantic import BaseModel
 from typing import TypeVar, Generic, Annotated
 
 T = TypeVar("T")
+
+logger = logging.getLogger("pagination")
 
 
 class PaginatedResponse(BaseModel, Generic[T]):
@@ -33,15 +37,20 @@ async def pagination_query(
 
 async def paginate(
         *, engine: AsyncEngine, query: sa.Select, limit: int, offset: int
-) -> dict:
+) -> dict[str, Any] | None:
     """
     Helper function for pagination.
     """
     count_query: sa.Select = sa.Select(sa.func.count()).select_from(query.subquery())
     paginated_query: sa.Select = query.limit(limit).offset(offset)
-    async with engine.begin() as conn:
-        result = {
-            "count": ((await conn.execute(count_query)).first())[0], # type: ignore
-            "items": (await conn.execute(paginated_query)).all()
-        }
-    return result
+    try:
+        async with engine.begin() as conn:
+            result = {
+                "count": ((await conn.execute(count_query)).first())[0], # type: ignore
+                "items": (await conn.execute(paginated_query)).all()
+            }
+        return result
+    except Exception as ex:
+        logger.error(ex)
+        return None
+    
