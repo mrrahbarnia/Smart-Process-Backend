@@ -126,3 +126,9 @@ class DuplicateArticleTagPk(HTTPException):
     def __init__(self) -> None:
         self.status_code = status.HTTP_409_CONFLICT
         self.detail = "PK unique for article_tags!"
+
+
+class DuplicateArticleTitle(HTTPException):
+    def __init__(self) -> None:
+        self.status_code = status.HTTP_409_CONFLICT
+        self.detail = "Unique title for articles!"

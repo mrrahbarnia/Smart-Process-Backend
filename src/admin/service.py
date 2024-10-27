@@ -34,7 +34,7 @@ from src.products.models import (
 from src.s3.utils import upload_to_s3, delete_from_s3
 from src.tickets.models import Ticket
 from src.tickets.types import TicketId
-from src.articles.models import Tag, ArticleTag
+from src.articles.models import Tag, ArticleTag, Article, ArticleImage
 from src.articles.types import ArticleId
 from src.articles.exceptions import ArticleNotFound
 
@@ -303,7 +303,7 @@ async def list_attributes(
         limit: int,
         offset: int,
         name__contain: str | None
-) -> dict:
+) -> dict | None:
     query = sa.select(Attribute.name)
     if name__contain:
         query = query.where(Attribute.name.ilike(f"%{name__contain}%"))
@@ -518,7 +518,7 @@ async def list_products(
         engine: AsyncEngine,
         limit: int,
         offset: int,
-) -> dict:
+) -> dict | None:
     sub_query = sa.select(
         ProductImage.url,
         ProductImage.product_id
@@ -729,6 +729,41 @@ async def delete_ticket(
     if result is None:
         raise exceptions.TicketNotFound
 
+async def create_article(
+        session: async_sessionmaker[AsyncSession],
+        payload: schemas.ArticleIn,
+        images: list[UploadFile],
+) -> None:
+    image_unique_names = await validate_images_and_return_unique_image_names(images)
+    query = sa.insert(Article).values(
+        {
+            Article.title: payload.title,
+            Article.description: payload.description
+        }
+    ).returning(Article.id)
+    try:
+        async with session.begin() as conn:
+            result: ArticleId | None = await conn.scalar(query)
+            image_query = sa.insert(ArticleImage).values(
+                [
+                    {
+                        ArticleImage.article_id: result,
+                        ArticleImage.url: image_name
+                    } for image_name in image_unique_names
+                ]
+            )
+            await conn.execute(image_query)
+    except IntegrityError as ex:
+        logger.warning(ex)
+        if "uq_articles_title" in str(ex):
+            raise exceptions.DuplicateArticleTitle
+
+    await asyncio.gather(*[
+        upload_to_s3(file=image_file, unique_filename=image_unique_name)
+        for image_unique_name, image_file in image_unique_names.items()
+    ])
+
+
 # ==================== Tag service ==================== #
 
 async def create_tag(
@@ -754,7 +789,7 @@ async def list_tags(
         limit: int,
         offset: int,
         name__contain: str | None
-) -> dict:
+) -> dict | None:
     query = sa.select(Tag.name)
     if name__contain:
         query = query.where(Tag.name.ilike(f"%{name__contain}%"))

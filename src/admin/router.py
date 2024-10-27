@@ -233,7 +233,7 @@ async def list_attributes(
     is_admin: Annotated[bool, Depends(is_admin)],
     pagination_info: Annotated[PaginationQuerySchema, Depends(pagination_query)],
     name__contain: str | None = None,
-) -> dict:
+) -> dict | None:
     result = await service.list_attributes(
         engine=engine,
         limit=pagination_info.limit,
@@ -384,7 +384,7 @@ async def list_products(
     filter_query: Annotated[schemas.ProductQuerySearch, Query()],
     engine: Annotated[AsyncEngine, Depends(get_engine)],
     pagination_info: Annotated[PaginationQuerySchema, Depends(pagination_query)]
-) -> dict:
+) -> dict | None:
     result = await service.list_products(
         filter_query=filter_query,
         engine=engine,
@@ -477,6 +477,25 @@ async def delete_ticket(
         ticket_id=ticket_id
     )
 
+# ==================== Article routes ==================== #
+
+@router.post(
+        "/create-article/",
+        status_code=status.HTTP_201_CREATED
+)
+async def create_article(
+        payload: schemas.ArticleIn,
+        images: list[UploadFile],
+        is_admin: Annotated[bool, Depends(is_admin)],
+        session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+) -> dict:
+    await service.create_article(
+        session=session,
+        payload=payload,
+        images=images
+    )
+    return {"detail": "Created successfully."}
+
 # ==================== Tag routes ==================== #
 
 @router.post(
@@ -502,7 +521,7 @@ async def list_tags(
     is_admin: Annotated[bool, Depends(is_admin)],
     pagination_info: Annotated[PaginationQuerySchema, Depends(pagination_query)],
     name__contain: str | None = None,
-) -> dict:
+) -> dict | None:
     result = await service.list_tags(
         engine=engine,
         limit=pagination_info.limit,

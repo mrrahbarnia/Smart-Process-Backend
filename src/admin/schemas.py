@@ -143,5 +143,14 @@ class Tag(BaseModel):
     name: Annotated[str, Field(max_length=200)]
 
 
-# class TagList(TagIn):
-#     id: TagId
+class ArticleIn(CustomBaseModel):
+    title: Annotated[str, Field(max_length=200)]
+    description: str
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_to_json(cls, value) -> Any:
+        if isinstance(value, str):
+            return cls(**json.loads(value))
+        return value
+

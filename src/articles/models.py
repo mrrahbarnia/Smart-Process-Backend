@@ -15,7 +15,7 @@ class Article(Base):
     id: so.Mapped[types.ArticleId] = so.mapped_column(
         primary_key=True, default=uuid4, init=False
     )
-    title: so.Mapped[str] = so.mapped_column(sa.String(200))
+    title: so.Mapped[str] = so.mapped_column(sa.String(200), unique=True)
     description: so.Mapped[str] = so.mapped_column(sa.Text)
     created_at: so.Mapped[datetime] = so.mapped_column(
         sa.TIMESTAMP(timezone=True), server_default=sa.func.now()
