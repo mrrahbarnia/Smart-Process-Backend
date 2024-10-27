@@ -10,7 +10,7 @@ from src.admin import service
 from src.products.types import CategoryId, ProductId, SerialNumber, CommentId
 from src.auth.dependencies import is_admin
 from src.tickets.types import TicketId
-from src.articles.types import ArticleId, GlossaryId
+from src.articles.types import ArticleId, GlossaryId, ArticleCommentId
 
 router = APIRouter()
 
@@ -646,4 +646,20 @@ async def update_glossary(
         session=session,
         glossary_id=glossary_id,
         payload=payload
+    )
+
+# ==================== ArticleComments routes ==================== #
+
+@router.delete(
+    "/delete-article-comment/{article_comment_id}/",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_article_comment(
+    article_comment_id: ArticleCommentId,
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+    is_admin: Annotated[bool, Depends(is_admin)],
+) -> None:
+    await service.delete_article_comment(
+        session=session,
+        article_comment_id=article_comment_id
     )

@@ -45,9 +45,10 @@ from src.articles.models import (
     ArticleTag,
     Article,
     ArticleImage,
-    GlossaryTerm
+    GlossaryTerm,
+    ArticleComment
 )
-from src.articles.types import ArticleId, GlossaryId
+from src.articles.types import ArticleId, GlossaryId, ArticleCommentId
 from src.articles.exceptions import ArticleNotFound
 
 logger = logging.getLogger("admin")
@@ -656,8 +657,11 @@ async def delete_comment(
         session: async_sessionmaker[AsyncSession],
 ) -> None:
     query = sa.delete(Comment).where(Comment.id==comment_id)
-    async with session.begin() as conn:
-        await conn.execute(query)
+    try:
+        async with session.begin() as conn:
+            await conn.execute(query)
+    except IntegrityError as ex:
+        logger.warning(ex)
 
 # ==================== Guaranty service ==================== #
 
@@ -992,5 +996,18 @@ async def update_glossary(
     except exceptions.GlossaryNotFound as ex:
         logger.warning(ex)
         raise exceptions.GlossaryNotFound
+    except IntegrityError as ex:
+        logger.warning(ex)
+
+# ==================== ArticleComment service ==================== #
+
+async def delete_article_comment(
+        article_comment_id: ArticleCommentId,
+        session: async_sessionmaker[AsyncSession],
+) -> None:
+    query = sa.delete(ArticleComment).where(ArticleComment.id==article_comment_id)
+    try:
+        async with session.begin() as conn:
+            await conn.execute(query)
     except IntegrityError as ex:
         logger.warning(ex)

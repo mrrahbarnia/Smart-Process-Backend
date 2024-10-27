@@ -15,10 +15,15 @@ from src.articles.models import (
     Tag,
     ArticleTag,
     ArticleImage,
-    GlossaryTerm
+    GlossaryTerm,
+    ArticleComment
 )
-from src.articles.types import ArticleId, GlossaryId
+from src.articles.types import ArticleId, GlossaryId, ArticleCommentId
+from src.auth.models import User
 from src.auth.types import UserId
+from src.products.schemas import CommentIn
+from src.products.types import CommentListResponse
+from src.products.exceptions import CommentNotCreated, CommentNotOwner
 
 logger = logging.getLogger("articles")
 
@@ -291,4 +296,75 @@ async def get_glossary_by_id(
     async with session.begin() as conn:
         glossary = (await conn.execute(query)).first()
         return glossary
+
+# ==================== Comment service ==================== #
+
+async def create_article_comment(
+        session: async_sessionmaker[AsyncSession],
+        article_id: ArticleId,
+        payload: CommentIn,
+        user_id: UserId
+) -> None:
+    query = sa.insert(ArticleComment).values(
+        {
+            ArticleComment.message: payload.message,
+            ArticleComment.article_id: article_id,
+            ArticleComment.user_id: user_id
+        }
+    )
+    try:
+        async with session.begin() as conn:
+            await conn.execute(query)
+    except IntegrityError as ex:
+        logger.warning(ex)
+        raise CommentNotCreated
+
+
+async def list_article_comments(
+        session: async_sessionmaker[AsyncSession],
+        article_id: ArticleId
+) -> list[CommentListResponse]:
+    query = (
+        sa.select(
+            ArticleComment.id,
+            ArticleComment.message,
+            ArticleComment.created_at,
+            User.username
+        )
+        .select_from(ArticleComment)
+        .join(User, ArticleComment.user_id==User.id)
+        .where(ArticleComment.article_id==article_id)
+        .order_by(ArticleComment.created_at.desc())
+    )
+    async with session.begin() as conn:
+        result = (await conn.execute(query)).all()
+    return [
+        {
+            "id": comment.id,
+            "username": comment.username,
+            "message": comment.message,
+            "created_at": comment.created_at
+        } for comment in result
+    ]
+
+
+async def delete_my_article_comment(
+        session: async_sessionmaker[AsyncSession],
+        article_comment_id: ArticleCommentId,
+        user_id: UserId
+) -> None:
+    query = sa.delete(ArticleComment).where(
+        sa.and_(
+            ArticleComment.id==article_comment_id,
+            ArticleComment.user_id==user_id
+        )
+    ).returning(ArticleComment.id)
+    try:
+        async with session.begin() as conn:
+            result: ArticleCommentId | None = await conn.scalar(query)
+            if result is None:
+                raise CommentNotOwner
+    except CommentNotOwner as ex:
+        logger.warning(ex)
+        raise CommentNotOwner
     

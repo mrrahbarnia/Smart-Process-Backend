@@ -7,10 +7,11 @@ from src.database import get_session, get_redis
 from src.pagination import PaginatedResponse, PaginationQuerySchema, pagination_query
 from src.articles import schemas
 from src.articles import service
-from src.articles.types import ArticleId, GlossaryId
+from src.articles.types import ArticleId, GlossaryId, ArticleCommentId
 from src.auth.models import User
 from src.auth.dependencies import get_current_active_user
-
+from src.products.schemas import CommentIn, CommentList
+from src.products.types import CommentListResponse
 
 router = APIRouter()
 
@@ -164,3 +165,55 @@ async def get_glossary(
         glossary_id=glossary_id,
     )
     return result
+
+# ==================== Comment routes ==================== #
+
+@router.post(
+    "/create-article-comment/{article_id}/",
+    status_code=status.HTTP_201_CREATED
+)
+async def create_article_comment(
+    article_id: ArticleId,
+    payload: CommentIn,
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+    user: Annotated[User, Depends(get_current_active_user)]
+) -> dict:
+    await service.create_article_comment(
+        session=session,
+        article_id=article_id,
+        payload=payload,
+        user_id=user.id
+    )
+    return {"detail": "Created successfully."}
+
+
+@router.get(
+    "/list-article-comments/{article_id}/",
+    status_code=status.HTTP_200_OK,
+    response_model=list[CommentList]
+)
+async def list_article_comments(
+    article_id: ArticleId,
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+) -> list[CommentListResponse]:
+    result = await service.list_article_comments(
+        article_id=article_id,
+        session=session
+    )
+    return result
+
+
+@router.delete(
+    "/delete-my-article-comment/{article_comment_id}/",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_my_article_comment(
+    article_comment_id: ArticleCommentId,
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+    user: Annotated[User, Depends(get_current_active_user)]
+) -> None:
+    await service.delete_my_article_comment(
+        session=session,
+        article_comment_id=article_comment_id,
+        user_id=user.id
+    )
