@@ -1,7 +1,6 @@
 import redis.asyncio as redis
 
 from typing import AsyncGenerator
-from functools import lru_cache
 from sqlalchemy.orm import DeclarativeBase, MappedAsDataclass
 from sqlalchemy import MetaData, INTEGER, String, UUID
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessionmaker, AsyncSession
@@ -47,10 +46,8 @@ class Base(MappedAsDataclass, DeclarativeBase):
     }
 
 
-@lru_cache
 def get_engine() -> AsyncEngine:
     return engine
-
 
 
 async def get_session() -> async_sessionmaker[AsyncSession]:

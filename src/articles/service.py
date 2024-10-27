@@ -116,6 +116,43 @@ async def article_detail(
         return None
 
 
+async def newest_articles(
+        session: async_sessionmaker[AsyncSession],
+        redis: Redis
+):
+    if cached_data := await redis.get(name="newest_articles"):
+        return json.loads(cached_data)
+    query = (
+        sa.select(
+            Article.id,
+            Article.title,
+            Article.created_at,
+            image_cte.c.image
+        )
+        .select_from(Article)
+        .join(image_cte, Article.id==image_cte.c.image_article_id)
+        .order_by(Article.created_at.desc())
+        .limit(10)
+    )
+    async with session.begin() as conn:
+        result = await conn.execute(query)
+        articles = result.fetchall()
+    articles_list = [
+        {
+            "id": str(article.id),
+            "title": article.title,
+            "created_at": str(article.created_at),
+            "image": article.image
+        } for article in articles
+    ]
+    await redis.set(
+        name="newest_articles",
+        value=json.dumps(articles_list),
+        ex=180   
+    )
+    return articles
+
+
 async def popular_articles(
         session: async_sessionmaker[AsyncSession],
         redis: Redis

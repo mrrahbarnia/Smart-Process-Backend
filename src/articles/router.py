@@ -48,6 +48,23 @@ async def article_detail(
     )
     return result
 
+
+@router.get(
+    "/newest-articles/",
+    response_model=list[schemas.ArticleNewest],
+    status_code=status.HTTP_200_OK
+)
+async def newest_articles(
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+    redis: Annotated[Redis, Depends(get_redis)]
+):
+    result = await service.newest_articles(
+        session=session,
+        redis=redis
+    )
+    return result
+
+
 @router.get(
     "/popular-articles/",
     response_model=list[schemas.ArticlePopular],

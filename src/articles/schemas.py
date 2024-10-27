@@ -12,39 +12,39 @@ from src.s3.config import storage_config
 class ArticleBase(CustomBaseModel):
     id: ArticleId
     title: Annotated[str, Field(max_length=200)]
-    
 
-class ArticlePopular(ArticleBase):
+
+class ArticleOneImage(ArticleBase):
     image: str
+
+    @field_validator("image", mode="after")
+    @classmethod
+    def set_image_url(cls, image: str) -> str:
+        return f"{storage_config.S3_API}/{image}"
+
+
+class ArticleNewest(ArticleOneImage):
+    created_at: Annotated[datetime, Field(alias="createdAt")]
+
+
+class ArticlePopular(ArticleOneImage):
     average_rating: Annotated[
         Decimal | None,
         Field(ge=0, le=5, alias="averageRating")
     ] = Decimal(0)
 
-    @field_validator("image", mode="after")
-    @classmethod
-    def set_image_url(cls, image: str) -> str:
-        return f"{storage_config.S3_API}/{image}"
 
-
-class ArticleMostViewed(ArticleBase):
-    image: str
+class ArticleMostViewed(ArticleOneImage):
     views: int
 
-    @field_validator("image", mode="after")
-    @classmethod
-    def set_image_url(cls, image: str) -> str:
-        return f"{storage_config.S3_API}/{image}"
 
-
-class ArticlesList(ArticleBase):
+class ArticlesList(ArticleOneImage):
     description: str
     tags: list[str]
     average_rating: Annotated[
         Decimal | None,
         Field(ge=0, le=5, alias="averageRating")
     ] = Decimal(0)
-    image: str
     created_at: Annotated[datetime, Field(alias="createdAt")]
 
     @field_validator("description", mode="after")
@@ -53,11 +53,6 @@ class ArticlesList(ArticleBase):
         splitted_words = description.split()
         truncated_text = ' '.join(splitted_words[:article_config.TRUNCATED_ARTICLE_WORDS])
         return truncated_text
-
-    @field_validator("image", mode="after")
-    @classmethod
-    def set_image_url(cls, image: str) -> str:
-        return f"{storage_config.S3_API}/{image}"
 
 
 class ArticleDetail(ArticleBase):
