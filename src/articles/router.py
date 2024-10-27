@@ -7,7 +7,7 @@ from src.database import get_session, get_redis
 from src.pagination import PaginatedResponse, PaginationQuerySchema, pagination_query
 from src.articles import schemas
 from src.articles import service
-from src.articles.types import ArticleId
+from src.articles.types import ArticleId, GlossaryId
 from src.auth.models import User
 from src.auth.dependencies import get_current_active_user
 
@@ -129,5 +129,38 @@ async def search_tag_by_name(
     result = await service.search_tag_by_name(
         session=session,
         tag_name=tag_name
+    )
+    return result
+
+# ==================== Glossary routes ==================== #
+
+@router.get(
+    "/get-glossaries/{article_id}/",
+    status_code=status.HTTP_200_OK,
+    response_model=list[schemas.Glossary]
+)
+async def get_glossaries(
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+    article_id: ArticleId
+):
+    result = await service.get_glossaries(
+        session=session,
+        article_id=article_id
+    )
+    return result
+
+
+@router.get(
+    "/get-glossary/{glossary_id}/",
+    status_code=status.HTTP_200_OK,
+    response_model=schemas.Glossary
+)
+async def get_glossary(
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+    glossary_id: GlossaryId
+):
+    result = await service.get_glossary_by_id(
+        session=session,
+        glossary_id=glossary_id,
     )
     return result

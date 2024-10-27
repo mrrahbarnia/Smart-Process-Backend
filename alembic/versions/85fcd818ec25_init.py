@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 1d82635ea530
+Revision ID: 85fcd818ec25
 Revises: 
-Create Date: 2024-10-26 12:54:33.006390
+Create Date: 2024-10-27 22:37:10.172245
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '1d82635ea530'
+revision: str = '85fcd818ec25'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -26,7 +26,8 @@ def upgrade() -> None:
     sa.Column('description', sa.Text(), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('views', sa.Integer(), nullable=False),
-    sa.PrimaryKeyConstraint('id', name=op.f('pk_articles'))
+    sa.PrimaryKeyConstraint('id', name=op.f('pk_articles')),
+    sa.UniqueConstraint('title', name=op.f('uq_articles_title'))
     )
     op.create_table('attributes',
     sa.Column('name', sa.String(length=200), nullable=False),
@@ -102,7 +103,7 @@ def upgrade() -> None:
     sa.Column('username', sa.String(length=250), nullable=False),
     sa.Column('password', sa.String(length=128), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('rule', sa.Enum('USER', 'ADMIN', name='userrule'), nullable=False),
+    sa.Column('role', sa.Enum('USER', 'ADMIN', name='userrole'), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.CheckConstraint('CHAR_LENGTH(phone_number) = 11', name=op.f('ck_users_check_phone_length')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_users')),
@@ -119,6 +120,8 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], name=op.f('fk_article_comments_user_id_users'), ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_article_comments'))
     )
+    op.create_index(op.f('ix_article_comments_article_id'), 'article_comments', ['article_id'], unique=False)
+    op.create_index(op.f('ix_article_comments_user_id'), 'article_comments', ['user_id'], unique=False)
     op.create_table('article_images',
     sa.Column('id', sa.INTEGER(), autoincrement=True, nullable=False),
     sa.Column('url', sa.String(length=250), nullable=False),
@@ -126,6 +129,7 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['article_id'], ['articles.id'], name=op.f('fk_article_images_article_id_articles'), ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_article_images'))
     )
+    op.create_index(op.f('ix_article_images_article_id'), 'article_images', ['article_id'], unique=False)
     op.create_table('article_tags',
     sa.Column('article_id', sa.UUID(), nullable=False),
     sa.Column('tag_name', sa.String(), nullable=False),
@@ -133,6 +137,8 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['tag_name'], ['tags.name'], name=op.f('fk_article_tags_tag_name_tags'), ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('article_id', 'tag_name', name=op.f('pk_article_tags'))
     )
+    op.create_index(op.f('ix_article_tags_article_id'), 'article_tags', ['article_id'], unique=False)
+    op.create_index(op.f('ix_article_tags_tag_name'), 'article_tags', ['tag_name'], unique=False)
     op.create_table('carts',
     sa.Column('id', sa.INTEGER(), autoincrement=True, nullable=False),
     sa.Column('total_quantity', sa.Integer(), nullable=True),
@@ -153,6 +159,16 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_categoryattributes_attribute_name'), 'categoryattributes', ['attribute_name'], unique=False)
     op.create_index(op.f('ix_categoryattributes_category_id'), 'categoryattributes', ['category_id'], unique=False)
+    op.create_table('glossary_terms',
+    sa.Column('id', sa.INTEGER(), autoincrement=True, nullable=False),
+    sa.Column('term', sa.String(length=250), nullable=False),
+    sa.Column('definition', sa.Text(), nullable=False),
+    sa.Column('article_id', sa.UUID(), nullable=False),
+    sa.ForeignKeyConstraint(['article_id'], ['articles.id'], name=op.f('fk_glossary_terms_article_id_articles'), ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id', name=op.f('pk_glossary_terms')),
+    sa.UniqueConstraint('term', 'article_id', name=op.f('uq_glossary_terms_term'))
+    )
+    op.create_index(op.f('ix_glossary_terms_article_id'), 'glossary_terms', ['article_id'], unique=False)
     op.create_table('products',
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('serial_number', sa.String(length=150), nullable=False),
@@ -191,6 +207,8 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id', name=op.f('pk_ratings')),
     sa.UniqueConstraint('user_id', 'article_id', name=op.f('uq_ratings_user_id'))
     )
+    op.create_index(op.f('ix_ratings_article_id'), 'ratings', ['article_id'], unique=False)
+    op.create_index(op.f('ix_ratings_user_id'), 'ratings', ['user_id'], unique=False)
     op.create_table('sales',
     sa.Column('id', sa.INTEGER(), autoincrement=True, nullable=False),
     sa.Column('total_quantity', sa.Integer(), nullable=False),
@@ -268,18 +286,27 @@ def downgrade() -> None:
     op.drop_table('attributevalues')
     op.drop_index(op.f('ix_sales_user_id'), table_name='sales')
     op.drop_table('sales')
+    op.drop_index(op.f('ix_ratings_user_id'), table_name='ratings')
+    op.drop_index(op.f('ix_ratings_article_id'), table_name='ratings')
     op.drop_table('ratings')
     op.drop_index(op.f('ix_products_category_id'), table_name='products')
     op.drop_index(op.f('ix_products_brand_id'), table_name='products')
     op.drop_index('idx_active_products', table_name='products', postgresql_where=sa.text('is_active = TRUE'))
     op.drop_table('products')
+    op.drop_index(op.f('ix_glossary_terms_article_id'), table_name='glossary_terms')
+    op.drop_table('glossary_terms')
     op.drop_index(op.f('ix_categoryattributes_category_id'), table_name='categoryattributes')
     op.drop_index(op.f('ix_categoryattributes_attribute_name'), table_name='categoryattributes')
     op.drop_table('categoryattributes')
     op.drop_index(op.f('ix_carts_user_id'), table_name='carts')
     op.drop_table('carts')
+    op.drop_index(op.f('ix_article_tags_tag_name'), table_name='article_tags')
+    op.drop_index(op.f('ix_article_tags_article_id'), table_name='article_tags')
     op.drop_table('article_tags')
+    op.drop_index(op.f('ix_article_images_article_id'), table_name='article_images')
     op.drop_table('article_images')
+    op.drop_index(op.f('ix_article_comments_user_id'), table_name='article_comments')
+    op.drop_index(op.f('ix_article_comments_article_id'), table_name='article_comments')
     op.drop_table('article_comments')
     op.drop_table('users')
     op.drop_table('tickets')

@@ -24,7 +24,7 @@ class Base(MappedAsDataclass, DeclarativeBase):
     metadata = MetaData(naming_convention=DB_NAMING_CONVENTION)
     type_annotation_map = {
         auth_types.UserId: INTEGER,
-        auth_types.UserRule: String,
+        auth_types.UserRole: String,
         auth_types.Password: String,
         auth_types.PhoneNumber: String,
         product_types.ProductId: UUID,
@@ -42,7 +42,8 @@ class Base(MappedAsDataclass, DeclarativeBase):
         article_types.ArticleId: UUID,
         article_types.ArticleImageId: INTEGER,
         article_types.RatingId: INTEGER,
-        article_types.ArticleCommentId: INTEGER
+        article_types.ArticleCommentId: INTEGER,
+        article_types.GlossaryId: INTEGER
     }
 
 

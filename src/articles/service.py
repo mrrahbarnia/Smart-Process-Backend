@@ -9,8 +9,15 @@ from sqlalchemy.dialects.postgresql import insert as postgres_insert
 
 from src.pagination import paginate
 from src.articles import exceptions
-from src.articles.models import Article, Rating, Tag, ArticleTag, ArticleImage
-from src.articles.types import ArticleId
+from src.articles.models import (
+    Article,
+    Rating,
+    Tag,
+    ArticleTag,
+    ArticleImage,
+    GlossaryTerm
+)
+from src.articles.types import ArticleId, GlossaryId
 from src.auth.types import UserId
 
 logger = logging.getLogger("articles")
@@ -135,8 +142,7 @@ async def newest_articles(
         .limit(10)
     )
     async with session.begin() as conn:
-        result = await conn.execute(query)
-        articles = result.fetchall()
+        articles = (await conn.execute(query)).all()
     articles_list = [
         {
             "id": str(article.id),
@@ -173,13 +179,12 @@ async def popular_articles(
         .limit(10)
     )
     async with session.begin() as conn:
-        result = await conn.execute(query)
-        articles = result.fetchall()
+        articles = (await conn.execute(query)).all()
     articles_list = [
         {
             "id": str(article.id),
             "title": article.title,
-            "average_rating": str(article.average_rating),
+            "average_rating": article.average_rating,
             "image": article.image
         } for article in articles
     ]
@@ -210,8 +215,7 @@ async def most_viewed_articles(
         .limit(10)
     )
     async with session.begin() as conn:
-        result = await conn.execute(query)
-        articles = result.fetchall()
+        articles = (await conn.execute(query)).all()
     articles_list = [
         {
             "id": str(article.id),
@@ -260,4 +264,31 @@ async def search_tag_by_name(
     async with session.begin() as conn:
         result = (await conn.scalars(query)).all()
         return [tag for tag in result]
+
+# ==================== Glossary service ==================== #
+
+async def get_glossaries(
+        article_id: ArticleId,
+        session: async_sessionmaker[AsyncSession]
+):
+    query = (
+        sa.select(GlossaryTerm.id, GlossaryTerm.term, GlossaryTerm.definition)
+        .where(GlossaryTerm.article_id==article_id)
+    )
+    async with session.begin() as conn:
+        glossaries = (await conn.execute(query)).all()
+        return glossaries
+
+
+async def get_glossary_by_id(
+        glossary_id: GlossaryId,
+        session: async_sessionmaker[AsyncSession]
+):
+    query = (
+        sa.select(GlossaryTerm.id, GlossaryTerm.term, GlossaryTerm.definition)
+        .where(GlossaryTerm.id==glossary_id)
+    )
+    async with session.begin() as conn:
+        glossary = (await conn.execute(query)).first()
+        return glossary
     

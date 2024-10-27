@@ -41,8 +41,8 @@ async def get_current_active_user(
 
 
 async def is_admin(data: Annotated[dict, Depends(decode_access_token)]) -> Literal[True]:
-    if "user_rule" not in data:
+    if "user_role" not in data:
         raise exceptions.CredentialsException
-    if data["user_rule"] != "admin":
+    if data["user_role"] != "admin":
         raise exceptions.IsAdminException
     return True

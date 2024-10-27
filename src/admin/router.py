@@ -10,7 +10,7 @@ from src.admin import service
 from src.products.types import CategoryId, ProductId, SerialNumber, CommentId
 from src.auth.dependencies import is_admin
 from src.tickets.types import TicketId
-from src.articles.types import ArticleId
+from src.articles.types import ArticleId, GlossaryId
 
 router = APIRouter()
 
@@ -595,4 +595,55 @@ async def unassign_tags_to_article(
         article_id=article_id,
         session=session,
         tag_name=payload.name
+    )
+
+# ==================== Glossary routes ==================== #
+
+@router.post(
+    "/create-glossary/{article_id}/",
+    status_code=status.HTTP_200_OK
+)
+async def create_glossary(
+    is_admin: Annotated[bool, Depends(is_admin)],
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+    article_id: ArticleId,
+    payload: schemas.GlossaryIn
+) -> dict:
+    await service.create_glossary(
+        session=session,
+        payload=payload,
+        article_id=article_id
+    )
+    return {"detail": "Created successfully."}
+
+
+@router.delete(
+    "/delete-glossary/{glossary_id}/",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_glossary(
+    is_admin: Annotated[bool, Depends(is_admin)],
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+    glossary_id: GlossaryId,
+) -> None:
+    await service.delete_glossary(
+        session=session,
+        glossary_id=glossary_id
+    )
+
+
+@router.put(
+    "/update-glossary/{glossary_id}/",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def update_glossary(
+    is_admin: Annotated[bool, Depends(is_admin)],
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+    payload: schemas.GlossaryIn,
+    glossary_id: GlossaryId,
+) -> None:
+    await service.update_glossary(
+        session=session,
+        glossary_id=glossary_id,
+        payload=payload
     )

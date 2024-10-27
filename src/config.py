@@ -31,8 +31,8 @@ class LogConfig(BaseModel):
     disable_existing_loggers: bool = False
     formatters: dict = {
         "console": {
-            "format": '%(asctime)s %(levelname)s %(module)s %(process)d %(thread)d %(message)s',
-            "class": "pythonjsonlogger.jsonlogger.JsonFormatter",
+            "format": '%(asctime)s %(levelname)s %(module)s %(funcName)s %(process)d %(thread)d %(message)s',
+            # "class": "pythonjsonlogger.jsonlogger.JsonFormatter",
             "datefmt": "%Y-%m-%dT%H:%M:%SZ",
         }
     }

@@ -82,7 +82,7 @@ async def login(
     if user.is_active is False:
         raise exceptions.NotActiveUser
 
-    return utils.encode_access_token(user_id=user.id, user_rule=user.rule)
+    return utils.encode_access_token(user_id=user.id, user_role=user.role)
 
 
 async def verify_account(

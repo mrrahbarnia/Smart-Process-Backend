@@ -1,7 +1,7 @@
 from typing import NewType
 from enum import Enum
 
-class UserRule(Enum):
+class UserRole(Enum):
     USER = "user"
     ADMIN = "admin"
 

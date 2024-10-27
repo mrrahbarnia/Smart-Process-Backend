@@ -34,7 +34,8 @@ class ArticleImage(Base):
     url: so.Mapped[str] = so.mapped_column(sa.String(250))
 
     article_id: so.Mapped[types.ArticleId] = so.mapped_column(
-        sa.ForeignKey(f"{Article.__tablename__}.id", ondelete="CASCADE")
+        sa.ForeignKey(f"{Article.__tablename__}.id", ondelete="CASCADE"),
+        index=True
     )
 
     def __repr__(self) -> str:
@@ -59,10 +60,12 @@ class ArticleTag(Base):
     )
 
     article_id: so.Mapped[types.ArticleId] = so.mapped_column(
-        sa.ForeignKey(f"{Article.__tablename__}.id", ondelete="CASCADE")
+        sa.ForeignKey(f"{Article.__tablename__}.id", ondelete="CASCADE"),
+        index=True
     )
     tag_name: so.Mapped[str] = so.mapped_column(
-        sa.ForeignKey(f"{Tag.__tablename__}.name", ondelete="CASCADE")
+        sa.ForeignKey(f"{Tag.__tablename__}.name", ondelete="CASCADE"),
+        index=True
     )
 
     def __repr__(self) -> str:
@@ -81,10 +84,12 @@ class Rating(Base):
     rating: so.Mapped[int]
 
     user_id: so.Mapped[UserId] = so.mapped_column(
-        sa.ForeignKey(f"{User.__tablename__}.id", ondelete="CASCADE")
+        sa.ForeignKey(f"{User.__tablename__}.id", ondelete="CASCADE"),
+        index=True
     )
     article_id: so.Mapped[types.ArticleId] = so.mapped_column(
-        sa.ForeignKey(f"{Article.__tablename__}.id", ondelete="CASCADE")
+        sa.ForeignKey(f"{Article.__tablename__}.id", ondelete="CASCADE"),
+        index=True
     )
 
     def __repr__(self) -> str:
@@ -102,19 +107,34 @@ class ArticleComment(Base):
     )
 
     user_id: so.Mapped[UserId] = so.mapped_column(
-        sa.ForeignKey(f"{User.__tablename__}.id", ondelete="CASCADE")
+        sa.ForeignKey(f"{User.__tablename__}.id", ondelete="CASCADE"),
+        index=True
     )
     article_id: so.Mapped[types.ArticleId] = so.mapped_column(
-        sa.ForeignKey(f"{Article.__tablename__}.id", ondelete="CASCADE")
+        sa.ForeignKey(f"{Article.__tablename__}.id", ondelete="CASCADE"),
+        index=True
     )
 
     def __repr__(self) -> str:
         return f"{self.id}"
 
 
-# class Glossary(Base):
-#     __tablename__ = "glossaries"
-#     id: so.Mapped[types.GlossaryId] = so.mapped_column(
-#         primary_key=True, autoincrement=True
-#     )
-#     word: so.Mapped[str] = 
+class GlossaryTerm(Base):
+    __tablename__ = "glossary_terms"
+    __table_args__ = (
+        sa.UniqueConstraint("term", "article_id"),
+    )
+
+    id: so.Mapped[types.GlossaryId] = so.mapped_column(
+        primary_key=True, autoincrement=True
+    )
+    term: so.Mapped[str] = so.mapped_column(sa.String(250))
+    definition: so.Mapped[str] = so.mapped_column(sa.Text)
+
+    article_id: so.Mapped[types.ArticleId] = so.mapped_column(
+        sa.ForeignKey(f"{Article.__tablename__}.id", ondelete="CASCADE"),
+        index=True
+    )
+
+    def __repr__(self) -> str:
+        return f"{self.id}"

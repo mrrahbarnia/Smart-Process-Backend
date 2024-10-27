@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from src.schemas import CustomBaseModel
-from src.articles.types import ArticleId
+from src.articles.types import ArticleId, GlossaryId
 from src.articles.config import article_config
 from src.s3.config import storage_config
 
@@ -29,9 +29,8 @@ class ArticleNewest(ArticleOneImage):
 
 class ArticlePopular(ArticleOneImage):
     average_rating: Annotated[
-        Decimal | None,
-        Field(ge=0, le=5, alias="averageRating")
-    ] = Decimal(0)
+        str | None, Field(alias="averageRating")
+    ]
 
 
 class ArticleMostViewed(ArticleOneImage):
@@ -40,7 +39,7 @@ class ArticleMostViewed(ArticleOneImage):
 
 class ArticlesList(ArticleOneImage):
     description: str
-    tags: list[str]
+    tags: list[str | None]
     average_rating: Annotated[
         Decimal | None,
         Field(ge=0, le=5, alias="averageRating")
@@ -77,3 +76,9 @@ class ArticleDetail(ArticleBase):
 
 class RatingIn(BaseModel):
     rating: Annotated[int, Field(ge=0, le=5)]
+
+
+class Glossary(CustomBaseModel):
+    id: GlossaryId
+    term: Annotated[str, Field(max_length=250)]
+    definition: str

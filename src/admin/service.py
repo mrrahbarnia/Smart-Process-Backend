@@ -20,7 +20,13 @@ from src.admin.utils import (
     create_unique_excel_name
 )
 from src.pagination import paginate
-from src.products.types import CategoryId, BrandId, ProductId, CommentId, SerialNumber
+from src.products.types import (
+    CategoryId,
+    BrandId,
+    ProductId,
+    CommentId,
+    SerialNumber
+)
 from src.products.models import (
     Brand,
     Category,
@@ -34,8 +40,14 @@ from src.products.models import (
 from src.s3.utils import upload_to_s3, delete_from_s3
 from src.tickets.models import Ticket
 from src.tickets.types import TicketId
-from src.articles.models import Tag, ArticleTag, Article, ArticleImage
-from src.articles.types import ArticleId
+from src.articles.models import (
+    Tag,
+    ArticleTag,
+    Article,
+    ArticleImage,
+    GlossaryTerm
+)
+from src.articles.types import ArticleId, GlossaryId
 from src.articles.exceptions import ArticleNotFound
 
 logger = logging.getLogger("admin")
@@ -763,7 +775,6 @@ async def create_article(
         for image_unique_name, image_file in image_unique_names.items()
     ])
 
-
 # ==================== Tag service ==================== #
 
 async def create_tag(
@@ -907,5 +918,79 @@ async def unassign_tags_to_article(
         logger.warning(ex)
         raise ex
 
+    except IntegrityError as ex:
+        logger.warning(ex)
+
+# ==================== Glossary service ==================== #
+
+async def create_glossary(
+        article_id: ArticleId,
+        session: async_sessionmaker[AsyncSession],
+        payload: schemas.GlossaryIn
+) -> None:
+    query = sa.insert(GlossaryTerm).values(
+        {
+            GlossaryTerm.term: payload.term,
+            GlossaryTerm.definition: payload.definition,
+            GlossaryTerm.article_id: article_id
+        }
+    )
+    try:
+        async with session.begin() as conn:
+            await conn.execute(query)
+    except IntegrityError as ex:
+        if "uq_glossary_terms_term" in str(ex):
+            logger.info(ex)
+            raise exceptions.UniqueConstraintGlossaryTerms
+        if "fk_glossary_terms_article_id_articles" in str(ex):
+            logger.warning(ex)
+            raise ArticleNotFound
+
+
+async def delete_glossary(
+        session: async_sessionmaker[AsyncSession],
+        glossary_id: GlossaryId
+) -> None:
+    query = (
+        sa.delete(GlossaryTerm)
+        .where(GlossaryTerm.id==glossary_id)
+        .returning(GlossaryTerm.id)
+    )
+    try:
+        async with session.begin() as conn:
+            result: GlossaryId | None = await conn.scalar(query)
+            if result is None:
+                raise exceptions.GlossaryNotFound
+    except exceptions.GlossaryNotFound as ex:
+        logger.warning(ex)
+        raise exceptions.GlossaryNotFound
+    except IntegrityError as ex:
+        logger.warning(ex)
+
+
+async def update_glossary(
+        session: async_sessionmaker[AsyncSession],
+        glossary_id: GlossaryId,
+        payload: schemas.GlossaryIn
+) -> None:
+    query = (
+        sa.update(GlossaryTerm)
+        .values(
+            {
+                GlossaryTerm.term: payload.term,
+                GlossaryTerm.definition: payload.definition
+            }
+        )
+        .where(GlossaryTerm.id==glossary_id)
+        .returning(GlossaryTerm.id)
+    )
+    try:
+        async with session.begin() as conn:
+            result: GlossaryId | None = await conn.scalar(query)
+            if result is None:
+                raise exceptions.GlossaryNotFound
+    except exceptions.GlossaryNotFound as ex:
+        logger.warning(ex)
+        raise exceptions.GlossaryNotFound
     except IntegrityError as ex:
         logger.warning(ex)

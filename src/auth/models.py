@@ -4,7 +4,7 @@ import sqlalchemy.orm as so
 from datetime import datetime
 
 from src.database import Base
-from src.auth.types import UserId, PhoneNumber, Password, UserRule
+from src.auth.types import UserId, PhoneNumber, Password, UserRole
 
 
 class User(Base):
@@ -20,7 +20,7 @@ class User(Base):
     created_at: so.Mapped[datetime] = so.mapped_column(
         sa.TIMESTAMP(timezone=True), server_default=sa.func.now()
     )
-    rule: so.Mapped[UserRule] = so.mapped_column(sa.Enum(UserRule), default=UserRule.USER)
+    role: so.Mapped[UserRole] = so.mapped_column(sa.Enum(UserRole), default=UserRole.USER)
     is_active: so.Mapped[bool] = so.mapped_column(default=False)
 
     def __repr__(self) -> str:

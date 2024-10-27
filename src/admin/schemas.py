@@ -18,6 +18,7 @@ from src.products import types as product_types
 from src.s3.config import storage_config
 from src.tickets.schemas import TicketIn
 from src.tickets.types import TicketId
+from src.articles.types import GlossaryId
 
 
 class Brand(BaseModel):
@@ -154,3 +155,7 @@ class ArticleIn(CustomBaseModel):
             return cls(**json.loads(value))
         return value
 
+
+class GlossaryIn(CustomBaseModel):
+    term: Annotated[str, Field(max_length=250)]
+    definition: str
