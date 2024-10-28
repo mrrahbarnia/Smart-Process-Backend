@@ -59,7 +59,7 @@ async def create_brand(
         payload: schemas.Brand,
         session: async_sessionmaker[AsyncSession],
         redis: Redis
-):
+) -> None:
     query = sa.insert(Brand).values(
         {
             Brand.name: payload.name,
@@ -72,6 +72,7 @@ async def create_brand(
             await conn.execute(query)
         await redis.delete("brand-list")
     except IntegrityError as ex:
+        logger.warning(ex)
         if "uq_brands_name" in str(ex):
             raise exceptions.UniqueConstraintBrandName
 
@@ -80,14 +81,17 @@ async def activate_brand(
         slug: str,
         session: async_sessionmaker[AsyncSession],
         redis: Redis
-):
+) -> None:
     query = sa.update(Brand).where(Brand.slug==slug).values(
         {
             Brand.is_active: True
         }
     )
-    async with session.begin() as conn:
-        await conn.execute(query)
+    try:
+        async with session.begin() as conn:
+            await conn.execute(query)
+    except IntegrityError as ex:
+        logger.warning(ex)
     await redis.delete("brand-list")
 
 
@@ -104,26 +108,34 @@ async def update_brand_by_slug(
             Brand.slug: payload.slug
         }
     ).where(Brand.slug==brand_slug).returning(Brand.id)
-    async with session.begin() as conn:
-        result: BrandId | None = await conn.scalar(query)
-    if result is None:
+    try:
+        async with session.begin() as conn:
+            result: BrandId | None = await conn.scalar(query)
+            if result is None:
+                raise exceptions.BrandNotFound
+            await redis.delete("brand-list")
+    except exceptions.BrandNotFound as ex:
+        logger.warning(ex)
         raise exceptions.BrandNotFound
-    else:
-        await redis.delete("brand-list")
+    except IntegrityError as ex:
+        logger.warning(ex)
 
 
 async def deactivate_brand(
         slug: str,
         session: async_sessionmaker[AsyncSession],
         redis: Redis
-):
+) -> None:
     query = sa.update(Brand).where(Brand.slug==slug).values(
         {
             Brand.is_active: False
         }
     )
-    async with session.begin() as conn:
-        await conn.execute(query)
+    try:
+        async with session.begin() as conn:
+            await conn.execute(query)
+    except Exception as ex:
+        logger.warning(ex)
     await redis.delete("brand-list")
 
 
@@ -131,14 +143,19 @@ async def delete_brand(
         slug: str,
         session: async_sessionmaker[AsyncSession],
         redis: Redis
-):
+) -> None:
     query = sa.delete(Brand).where(Brand.slug==slug)
-    async with session.begin() as conn:
-        await conn.execute(query)
+    try:
+        async with session.begin() as conn:
+            await conn.execute(query)
+    except Exception as ex:
+        logger.warning(ex)
     await redis.delete("brand-list")
 
 
-async def all_brands(engine: AsyncEngine, limit: int, offset: int):
+async def all_brands(
+        engine: AsyncEngine, limit: int, offset: int
+) -> dict | None:
     query = sa.select(
         Brand.name, Brand.slug, Brand.description, Brand.is_active
     ).order_by(Brand.created_at.desc())
@@ -154,25 +171,28 @@ async def add_category(
         redis: Redis
 ) -> None:
     if payload.parent_category_name:
-        parent_query = sa.select(Category).where(Category.name==payload.parent_category_name)
-        async with session.begin() as conn:
-            parent_category: Category | None = await conn.scalar(parent_query)
-            if parent_category is None:
-                raise exceptions.InvalidParentCategoryName
-            query = sa.insert(Category).values(
-                {
-                    Category.name: payload.name,
-                    Category.description: payload.description,
-                    Category.parent_id: parent_category.id
-                }
-            )
-            try:
-                async with session.begin() as conn:
-                    await conn.scalars(query)
-                await redis.delete("sub-categories:{parent_category.id}")
-            except IntegrityError as ex:
-                if "uq_categories_name" in str(ex):
-                    raise exceptions.DuplicateCategoryName
+        parent_query = sa.select(Category.id).where(Category.name==payload.parent_category_name)
+        try:
+            async with session.begin() as conn:
+                parent_category_id: CategoryId | None = await conn.scalar(parent_query)
+                if parent_category_id is None:
+                    raise exceptions.InvalidParentCategoryName
+                query = sa.insert(Category).values(
+                    {
+                        Category.name: payload.name,
+                        Category.description: payload.description,
+                        Category.parent_id: parent_category_id
+                    }
+                )
+                await conn.execute(query)
+        except exceptions.InvalidParentCategoryName as ex:
+            logger.warning(ex)
+            raise exceptions.InvalidParentCategoryName
+        except IntegrityError as ex:
+            logger.warning(ex)
+            if "uq_categories_name" in str(ex):
+                raise exceptions.DuplicateCategoryName
+        await redis.delete(f"sub-categories:{parent_category_id}")
     else:
         without_parent_query = sa.insert(Category).values(
             {
@@ -184,13 +204,18 @@ async def add_category(
             async with session.begin() as conn:
                 await conn.execute(without_parent_query)
         except IntegrityError as ex:
+            logger.warning(ex)
             if "uq_categories_name" in str(ex):
                 raise exceptions.DuplicateCategoryName
         await redis.delete("root-categories")
     
 
 
-async def all_categories(engine: AsyncEngine, limit: int, offset: int):
+async def all_categories(
+        engine: AsyncEngine,
+        limit: int,
+        offset: int
+) -> dict | None:
     parent_category_table_name = so.aliased(Category)
     parent_category_name = (parent_category_table_name.name).label("parent_name")
     query = (
@@ -217,10 +242,16 @@ async def delete_category_by_id(
         redis: Redis
 ) -> None:
     query = sa.delete(Category).where(Category.id==category_id).returning(Category.id)
-    async with session.begin() as conn:
-        result = await conn.scalar(query)
-    if result is None:
+    try:
+        async with session.begin() as conn:
+            result = await conn.scalar(query)
+            if result is None:
+                raise exceptions.CategoryNotFound
+    except exceptions.CategoryNotFound as ex:
+        logger.warning(ex)
         raise exceptions.CategoryNotFound
+    except IntegrityError as ex:
+        logger.warning(ex)
     await redis.delete("root-categories")
     async for key in redis.scan_iter("sub-categories:*"):
         await redis.delete(key)
@@ -231,30 +262,36 @@ async def update_category_by_id(
         category_id: CategoryId,
         payload: schemas.Category,
         redis: Redis
-):
+) -> None:
     if payload.parent_category_name:
         parent_query = sa.select(Category.id).where(
             Category.name==payload.parent_category_name
         )
-        async with session.begin() as conn:
-            result: CategoryId | None = await conn.scalar(parent_query)
-        if result is None:
+        try:
+            async with session.begin() as conn:
+                result: CategoryId | None = await conn.scalar(parent_query)
+                if result is None:
+                    raise exceptions.InvalidParentCategoryName
+                updated_query = sa.update(Category).where(Category.id==category_id).values(
+                    {
+                        Category.name: payload.name,
+                        Category.parent_id: result if payload.parent_category_name else None
+                    }
+                ).returning(Category.id)
+                updated_result: CategoryId | None = await conn.scalar(updated_query)
+                if updated_result is None:
+                    raise exceptions.CategoryNotFound
+            await redis.delete(f"sub-categories:{result}")
+        except exceptions.InvalidParentCategoryName as ex:
+            logger.warning(ex)
             raise exceptions.InvalidParentCategoryName
-        await redis.delete(f"sub-categories:{result}")
-    updated_query = sa.update(Category).where(Category.id==category_id).values(
-        {
-            Category.name: payload.name,
-            Category.parent_id: result if payload.parent_category_name else None
-        }
-    ).returning(Category.id)
-    try:
-        async with session.begin() as conn:
-            updated_result: CategoryId | None = await conn.scalar(updated_query)
-        if updated_result is None:
+        except exceptions.CategoryNotFound as ex:
+            logger.warning(ex)
             raise exceptions.CategoryNotFound
-    except IntegrityError as ex:
-        if "uq_categories_name" in str(ex):
-            raise exceptions.DuplicateCategoryName
+        except IntegrityError as ex:
+            logger.warning(ex)
+            if "uq_categories_name" in str(ex):
+                raise exceptions.DuplicateCategoryName
     if not payload.parent_category_name:
         await redis.delete("root-categories")
 
@@ -272,8 +309,11 @@ async def activate_category(
             Category.is_active: True
         }
     )
-    async with session.begin() as conn:
-        await conn.execute(query)
+    try:
+        async with session.begin() as conn:
+            await conn.execute(query)
+    except Exception as ex:
+        logger.warning(ex)
 
 
 async def deactivate_category(
@@ -289,8 +329,11 @@ async def deactivate_category(
             Category.is_active: False
         }
     )
-    async with session.begin() as conn:
-        await conn.execute(query)
+    try:
+        async with session.begin() as conn:
+            await conn.execute(query)
+    except Exception as ex:
+        logger.warning(ex)
 
 # ==================== Attribute service ==================== #
 
@@ -307,6 +350,7 @@ async def create_attribute(
         async with session.begin() as conn:
             await conn.execute(query)
     except IntegrityError as ex:
+        logger.warning(ex)
         if "pk_attributes" in str(ex):
             raise exceptions.DuplicateAttributeName
 
@@ -334,10 +378,16 @@ async def delete_attribute(
         .where(Attribute.name==attribute_name)
         .returning(Attribute.name)
     )
-    async with session.begin() as conn:
-        result: str | None = await conn.scalar(query)
-    if result is None:
+    try:
+        async with session.begin() as conn:
+            result: str | None = await conn.scalar(query)
+            if result is None:
+                raise exceptions.AttributeNotFound
+    except exceptions.AttributeNotFound as ex:
+        logger.warning(ex)
         raise exceptions.AttributeNotFound
+    except IntegrityError as ex:
+        logger.warning(ex)
 
 
 async def update_attribute(
@@ -358,8 +408,11 @@ async def update_attribute(
     try:
         async with session.begin() as conn:
             result: str | None = await conn.scalar(query)
-        if result is None:
-            raise exceptions.AttributeNotFound
+            if result is None:
+                raise exceptions.AttributeNotFound
+    except exceptions.AttributeNotFound as ex:
+        logger.warning(ex)
+        raise exceptions.AttributeNotFound
     except IntegrityError as ex:
         if "pk_attributes" in str(ex):
             raise exceptions.DuplicateAttributeName
@@ -377,18 +430,17 @@ async def assign_category_attribute(
                 CategoryAttribute.attribute_name: attribute_name
             }
         )
-    async with session.begin() as conn:
-        try:
-            await conn.execute(query)
-        except IntegrityError as ex:
-            if "fk_categoryattributes_category_id_categories" in str(ex):
-                raise exceptions.CategoryNotFound
-            if "pk_categoryattributes" in str(ex):
-                raise exceptions.CategoryAttributeUniqueTogether
-            if "fk_categoryattributes_attribute_name_attributes" in str(ex):
-                raise exceptions.AttributeNotFound
-        except Exception as ex:
-            logger.warning(f"Unexpected error => {ex}")
+    try:
+        async with session.begin() as conn:
+                await conn.execute(query)
+    except IntegrityError as ex:
+        logger.warning(ex)
+        if "fk_categoryattributes_category_id_categories" in str(ex):
+            raise exceptions.CategoryNotFound
+        if "pk_categoryattributes" in str(ex):
+            raise exceptions.CategoryAttributeUniqueTogether
+        if "fk_categoryattributes_attribute_name_attributes" in str(ex):
+            raise exceptions.AttributeNotFound
 
 
 async def unassign_category_attribute(
@@ -402,10 +454,16 @@ async def unassign_category_attribute(
             CategoryAttribute.attribute_name==attribute_name
         )
     ).returning(CategoryAttribute.category_id)
-    async with session.begin() as conn:
-        result: CategoryId | None = await conn.scalar(query)
-        if result is None:
-            raise exceptions.UnassignedWentWrong
+    try:
+        async with session.begin() as conn:
+            result: CategoryId | None = await conn.scalar(query)
+            if result is None:
+                raise exceptions.UnassignedWentWrong
+    except exceptions.UnassignedWentWrong as ex:
+        logger.warning(ex)
+        raise exceptions.UnassignedWentWrong
+    except IntegrityError as ex:
+        logger.warning(ex)
 
 # ==================== Products service ==================== #
 
@@ -422,58 +480,63 @@ async def create_product(
     brand_query = sa.select(Brand.id).where(
         Brand.name==payload.brand_name
     )
-    async with session.begin() as conn:
-        category_id: CategoryId | None = await conn.scalar(category_query)
-        brand_id: BrandId | None = await conn.scalar(brand_query)
-        if category_id is None:
-            raise exceptions.CategoryNotFound
-        if brand_id is None:
-            raise exceptions.BrandNotFound
-        product_query = sa.insert(Product).values(
-            {
-                Product.serial_number: payload.serial_number,
-                Product.name: payload.name,
-                Product.description: payload.description,
-                Product.stock: payload.stock,
-                Product.price: payload.price,
-                Product.discount: payload.discount if payload.discount else None,
-                Product.expiry_discount: payload.expiry_discount if payload.expiry_discount else None,
-                Product.brand_id: brand_id,
-                Product.category_id: category_id
-            }
-        ).returning(Product.id)
-        try:
+    try:
+        async with session.begin() as conn:
+            category_id: CategoryId | None = await conn.scalar(category_query)
+            brand_id: BrandId | None = await conn.scalar(brand_query)
+            if category_id is None:
+                raise exceptions.CategoryNotFound
+            if brand_id is None:
+                raise exceptions.BrandNotFound
+            product_query = sa.insert(Product).values(
+                {
+                    Product.serial_number: payload.serial_number,
+                    Product.name: payload.name,
+                    Product.description: payload.description,
+                    Product.stock: payload.stock,
+                    Product.price: payload.price,
+                    Product.discount: payload.discount if payload.discount else None,
+                    Product.expiry_discount: payload.expiry_discount if payload.expiry_discount else None,
+                    Product.brand_id: brand_id,
+                    Product.category_id: category_id
+                }
+            ).returning(Product.id)
             product_id: ProductId | None = await conn.scalar(product_query)
-        except IntegrityError as ex:
-            if "uq_products_name" in str(ex):
-                raise exceptions.DuplicateProductName
-            if "uq_products_serial_number" in str(ex):
-                raise exceptions.DuplicateProductSerialNumber
-        image_query = sa.insert(ProductImage).values(
-            [
-                {
-                    ProductImage.url: image_name,
-                    ProductImage.product_id: product_id
-                } for image_name in image_unique_names
-            ]
-        )
-        attribute_query = sa.insert(AttributeValue).values(
-            [
-                {
-                    AttributeValue.value: attribute_value.value,
-                    AttributeValue.attribute_name: attribute_value.attribute,
-                    AttributeValue.product_id: product_id
-                } for attribute_value in payload.attribute_values
-            ]
-        )
-        await conn.execute(image_query)
-        try:
+            image_query = sa.insert(ProductImage).values(
+                [
+                    {
+                        ProductImage.url: image_name,
+                        ProductImage.product_id: product_id
+                    } for image_name in image_unique_names
+                ]
+            )
+            attribute_query = sa.insert(AttributeValue).values(
+                [
+                    {
+                        AttributeValue.value: attribute_value.value,
+                        AttributeValue.attribute_name: attribute_value.attribute,
+                        AttributeValue.product_id: product_id
+                    } for attribute_value in payload.attribute_values
+                ]
+            )
+            await conn.execute(image_query)
             await conn.execute(attribute_query)
-        except IntegrityError as ex:
-            if "fk_attributevalues_attribute_name_attributes" in str(ex):
-                raise exceptions.AttributeNotFound
-            if "fk_attributevalues_product_id_products" in str(ex):
-                raise exceptions.ProductNotFound
+    except exceptions.CategoryNotFound as ex:
+        logger.warning(ex)
+        raise exceptions.CategoryNotFound
+    except exceptions.BrandNotFound as ex:
+        logger.warning(ex)
+        raise exceptions.BrandNotFound
+    except IntegrityError as ex:
+        logger.warning(ex)
+        if "uq_products_name" in str(ex):
+            raise exceptions.DuplicateProductName
+        if "uq_products_serial_number" in str(ex):
+            raise exceptions.DuplicateProductSerialNumber
+        if "fk_attributevalues_attribute_name_attributes" in str(ex):
+            raise exceptions.AttributeNotFound
+        if "fk_attributevalues_product_id_products" in str(ex):
+            raise exceptions.ProductNotFound
 
     await asyncio.gather(*[
         upload_to_s3(file=image_file, unique_filename=image_unique_name)
@@ -490,10 +553,16 @@ async def activate_product(
             Product.is_active: True
         }
     ).returning(Product.id)
-    async with session.begin() as conn:
-        result: ProductId | None = await conn.scalar(query)
-    if result is None:
+    try:
+        async with session.begin() as conn:
+            result: ProductId | None = await conn.scalar(query)
+            if result is None:
+                raise exceptions.ProductNotFound
+    except exceptions.ProductNotFound as ex:
+        logger.warning(ex)
         raise exceptions.ProductNotFound
+    except IntegrityError as ex:
+        logger.warning(ex)
 
 
 async def deactivate_product(
@@ -505,10 +574,16 @@ async def deactivate_product(
             Product.is_active: False
         }
     ).returning(Product.id)
-    async with session.begin() as conn:
-        result: ProductId | None = await conn.scalar(query)
-    if result is None:
+    try:
+        async with session.begin() as conn:
+            result: ProductId | None = await conn.scalar(query)
+            if result is None:
+                raise exceptions.ProductNotFound
+    except exceptions.ProductNotFound as ex:
+        logger.warning(ex)
         raise exceptions.ProductNotFound
+    except IntegrityError as ex:
+        logger.warning(ex)
 
 
 async def delete_product(
@@ -519,9 +594,12 @@ async def delete_product(
         ProductImage.product_id==product_id
     )
     query = sa.delete(Product).where(Product.id==product_id)
-    async with session.begin() as conn:
-        result = list((await conn.scalars(image_query)).all())
-        await conn.execute(query)
+    try:
+        async with session.begin() as conn:
+            result = list((await conn.scalars(image_query)).all())
+            await conn.execute(query)
+    except Exception as ex:
+        logger.warning(ex)
     for image_name in result:
         await delete_from_s3(image_name)
 
@@ -625,8 +703,11 @@ async def product_detail(
         .join(AttributeValue, Product.id==AttributeValue.product_id, isouter=True)
         .where(Product.serial_number==product_serial)
     )
-    async with session.begin() as conn:
-        result = (await conn.execute(query)).all()
+    try:
+        async with session.begin() as conn:
+            result = (await conn.execute(query)).all()
+    except Exception as ex:
+        logger.warning(ex)
 
     if len(result) == 0:
         raise exceptions.ProductNotFound
@@ -690,7 +771,7 @@ async def process_excel_data(
             "product_name": row[2],
             "guaranty_days": row[3],
             "produced_at": row[4].replace(" ق.ظ", "").replace(" ب.ظ", "")
-        } for row in sheet.iter_rows(min_row=2, values_only=True)
+        } for row in sheet.iter_rows(min_row=1, values_only=True)
     ]
 
     def chunks(data: list, chunk_size: int):
@@ -705,7 +786,7 @@ async def process_excel_data(
                 await conn.execute(query)
             # TODO: Send a message for admin user if data processed successfully here.
     except IntegrityError as ex:
-        logger.warning(f"Unexpected error occurred {ex}")
+        logger.warning(ex)
 
 # ==================== Ticket service ==================== #
 
@@ -713,7 +794,7 @@ async def list_tickets(
         engine: AsyncEngine,
         limit: int,
         offset: int
-):
+) -> dict | None:
     query = sa.select(
         Ticket.id,
         Ticket.name,
@@ -740,10 +821,15 @@ async def delete_ticket(
     query = sa.delete(Ticket).where(
         Ticket.id==ticket_id
     ).returning(Ticket.id)
-    async with session.begin() as conn:
-        result: TicketId | None = await conn.scalar(query)
-    if result is None:
+    try:
+        async with session.begin() as conn:
+            result: TicketId | None = await conn.scalar(query)
+            if result is None:
+                raise exceptions.TicketNotFound
+    except exceptions.TicketNotFound as ex:
+        logger.warning(ex)
         raise exceptions.TicketNotFound
+
 
 async def create_article(
         session: async_sessionmaker[AsyncSession],
@@ -830,7 +916,7 @@ async def delete_tag(
 
     except exceptions.TagNotFound as ex:
         logger.warning(ex)
-        raise ex
+        raise exceptions.TagNotFound
 
     except IntegrityError as ex:
         logger.warning(ex)
@@ -859,7 +945,7 @@ async def update_tag(
 
     except exceptions.TagNotFound as ex:
         logger.warning(ex)
-        raise ex
+        raise exceptions.TagNotFound
 
     except IntegrityError as ex:
         logger.warning(ex)
@@ -884,10 +970,10 @@ async def assign_tags_to_article(
                 }
             )
             await conn.execute(query)
-    
+
     except exceptions.TagNotFound as ex:
         logger.warning(ex)
-        raise ex
+        raise exceptions.TagNotFound
 
     except IntegrityError as ex:
         logger.warning(ex)
@@ -920,7 +1006,7 @@ async def unassign_tags_to_article(
 
     except exceptions.TagNotFound as ex:
         logger.warning(ex)
-        raise ex
+        raise exceptions.TagNotFound
 
     except IntegrityError as ex:
         logger.warning(ex)
@@ -943,11 +1029,10 @@ async def create_glossary(
         async with session.begin() as conn:
             await conn.execute(query)
     except IntegrityError as ex:
+        logger.warning(ex)
         if "uq_glossary_terms_term" in str(ex):
-            logger.info(ex)
             raise exceptions.UniqueConstraintGlossaryTerms
         if "fk_glossary_terms_article_id_articles" in str(ex):
-            logger.warning(ex)
             raise ArticleNotFound
 
 

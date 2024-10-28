@@ -1,3 +1,4 @@
+import logging
 import json
 import sqlalchemy as sa
 
@@ -33,6 +34,8 @@ from src.admin.schemas import ProductQuerySearch
 from src.admin.types import GuarantySerial
 from src.admin.exceptions import ProductNotFound
 
+logger = logging.getLogger("products")
+
 # ==================== Brand services ==================== #
 
 async def active_brands(
@@ -44,8 +47,11 @@ async def active_brands(
     query = sa.select(
         Brand.name, Brand.slug, Brand.description, Brand.is_active
     ).where(Brand.is_active.is_(True))
-    async with session.begin() as conn:
-        result = (await conn.execute(query)).all()
+    try:
+        async with session.begin() as conn:
+            result = (await conn.execute(query)).all()
+    except Exception as ex:
+        logger.warning(ex)
     result_list = [
         {
             "name": brand.name,
@@ -66,8 +72,11 @@ async def search_brand_by_name(
         brand_name: str
 ) -> list[str]:
     query = sa.select(Brand.name).where(Brand.name.ilike(f"%{brand_name}%"))
-    async with session.begin() as conn:
-        result = (await conn.scalars(query)).all()
+    try:
+        async with session.begin() as conn:
+            result = (await conn.scalars(query)).all()
+    except Exception as ex:
+        logger.warning(ex)
     return [brand for brand in result]
 
 # ==================== Category services ==================== #
@@ -77,8 +86,11 @@ async def search_category_by_name(
         category_name: str
 ) -> list[str]:
     query = sa.select(Category.name).where(Category.name.ilike(f"%{category_name}%"))
-    async with session.begin() as conn:
-        result = (await conn.scalars(query)).all()
+    try:
+        async with session.begin() as conn:
+            result = (await conn.scalars(query)).all()
+    except Exception as ex:
+        logger.warning(ex)
     return [cat for cat in result]
 
 
@@ -94,8 +106,11 @@ async def root_categories(
             Category.is_active.is_(True)
         )
     )
-    async with session.begin() as conn:
-        result = (await conn.execute(query)).all()
+    try:
+        async with session.begin() as conn:
+            result = (await conn.execute(query)).all()
+    except Exception as ex:
+        logger.warning(ex)
     result_list = [
         {
             "id": category.id,
@@ -123,8 +138,11 @@ async def sub_categories(
             Category.is_active.is_(True)
         )
     )
-    async with session.begin() as conn:
-        result = (await conn.execute(query)).all()
+    try:
+        async with session.begin() as conn:
+            result = (await conn.execute(query)).all()
+    except Exception as ex:
+        logger.warning(ex)
     result_list = [
         {
             "id": category.id,
@@ -150,8 +168,11 @@ async def list_assigned_attributes(
         .join(Category, Category.id==CategoryAttribute.category_id)
         .where(Category.name==category_name)
     )
-    async with session.begin() as conn:
-        result = (await conn.scalars(query)).all()
+    try:
+        async with session.begin() as conn:
+            result = (await conn.scalars(query)).all()
+    except Exception as ex:
+        logger.warning(ex)
     return [attribute_name for attribute_name in result]
 
 # ==================== Comment services ==================== #
@@ -172,7 +193,8 @@ async def create_comment(
     try:
         async with session.begin() as conn:
             await conn.execute(query)
-    except IntegrityError:
+    except IntegrityError as ex:
+        logger.warning(ex)
         raise exceptions.CommentNotCreated
 
 
@@ -192,8 +214,11 @@ async def list_comments(
         .where(Comment.product_id==product_id)
         .order_by(Comment.created_at.desc())
     )
-    async with session.begin() as conn:
-        result = (await conn.execute(query)).all()
+    try:
+        async with session.begin() as conn:
+            result = (await conn.execute(query)).all()
+    except Exception as ex:
+        logger.warning(ex)
     return [
         {
             "id": comment.id,
@@ -215,10 +240,16 @@ async def delete_my_comment(
             Comment.user_id==user_id
         )
     ).returning(Comment.id)
-    async with session.begin() as conn:
-        result: CommentId | None = await conn.scalar(query)
-    if result is None:
+    try:
+        async with session.begin() as conn:
+            result: CommentId | None = await conn.scalar(query)
+            if result is None:
+                raise exceptions.CommentNotOwner
+    except exceptions.CommentNotOwner as ex:
+        logger.warning(ex)
         raise exceptions.CommentNotOwner
+    except IntegrityError as ex:
+        logger.warning(ex)
 
 # ==================== Attribute services ==================== #
 
@@ -230,8 +261,11 @@ async def search_attribute(
         sa.select(Attribute.name)
         .where(Attribute.name.ilike(f"%{attribute_name}%"))
     )
-    async with session.begin() as conn:
-        result = (await conn.scalars(query)).all()
+    try:
+        async with session.begin() as conn:
+            result = (await conn.scalars(query)).all()
+    except Exception as ex:
+        logger.warning(ex)
     return [attr for attr in result]
 
 # ==================== Product services ==================== #
@@ -241,7 +275,7 @@ async def list_products(
         filter_query: ProductQuerySearch,
         limit: int,
         offset: int
-) -> dict:
+) -> dict | None:
     sub_query = sa.select(
         ProductImage.url,
         ProductImage.product_id
@@ -384,8 +418,11 @@ async def product_detail(
             )
         )
     )
-    async with session.begin() as conn:
-        result = (await conn.execute(query)).all()
+    try:
+        async with session.begin() as conn:
+            result = (await conn.execute(query)).all()
+    except Exception as ex:
+        logger.warning(ex)
 
     if len(result) == 0:
         raise ProductNotFound
@@ -425,8 +462,12 @@ async def inquiry_guaranty(
     ).where(
         Guaranty.guaranty_serial==serial_number
     )
-    async with session.begin() as conn:
-        guaranty = (await conn.execute(query)).first()
-    if guaranty is None:
+    try:
+        async with session.begin() as conn:
+            guaranty = (await conn.execute(query)).first()
+            if guaranty is None:
+                raise exceptions.GuarantyNotFound
+        return guaranty
+    except exceptions.GuarantyNotFound as ex:
+        logger.warning(ex)
         raise exceptions.GuarantyNotFound
-    return guaranty

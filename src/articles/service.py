@@ -146,8 +146,11 @@ async def newest_articles(
         .order_by(Article.created_at.desc())
         .limit(10)
     )
-    async with session.begin() as conn:
-        articles = (await conn.execute(query)).all()
+    try:
+        async with session.begin() as conn:
+            articles = (await conn.execute(query)).all()
+    except Exception as ex:
+        logger.warning(ex)
     articles_list = [
         {
             "id": str(article.id),
@@ -183,8 +186,11 @@ async def popular_articles(
         .order_by(rating_cte.c.average_rating.desc())
         .limit(10)
     )
-    async with session.begin() as conn:
-        articles = (await conn.execute(query)).all()
+    try:
+        async with session.begin() as conn:
+            articles = (await conn.execute(query)).all()
+    except Exception as ex:
+        logger.warning(ex)
     articles_list = [
         {
             "id": str(article.id),
@@ -219,8 +225,11 @@ async def most_viewed_articles(
         .order_by(Article.views.desc())
         .limit(10)
     )
-    async with session.begin() as conn:
-        articles = (await conn.execute(query)).all()
+    try:
+        async with session.begin() as conn:
+            articles = (await conn.execute(query)).all()
+    except Exception as ex:
+        logger.warning(ex)
     articles_list = [
         {
             "id": str(article.id),
@@ -264,11 +273,15 @@ async def rating_article(
 async def search_tag_by_name(
         session: async_sessionmaker[AsyncSession],
         tag_name: str
-) -> list[str]:
+) -> list[str] | None:
     query = sa.select(Tag.name).where(Tag.name.ilike(f"%{tag_name}%"))
-    async with session.begin() as conn:
-        result = (await conn.scalars(query)).all()
-        return [tag for tag in result]
+    try:
+        async with session.begin() as conn:
+            result = (await conn.scalars(query)).all()
+            return [tag for tag in result]
+    except Exception as ex:
+        logger.warning(ex)
+        return None
 
 # ==================== Glossary service ==================== #
 
@@ -280,9 +293,12 @@ async def get_glossaries(
         sa.select(GlossaryTerm.id, GlossaryTerm.term, GlossaryTerm.definition)
         .where(GlossaryTerm.article_id==article_id)
     )
-    async with session.begin() as conn:
-        glossaries = (await conn.execute(query)).all()
+    try:
+        async with session.begin() as conn:
+            glossaries = (await conn.execute(query)).all()
         return glossaries
+    except Exception as ex:
+        logger.warning(ex)
 
 
 async def get_glossary_by_id(
@@ -293,9 +309,12 @@ async def get_glossary_by_id(
         sa.select(GlossaryTerm.id, GlossaryTerm.term, GlossaryTerm.definition)
         .where(GlossaryTerm.id==glossary_id)
     )
-    async with session.begin() as conn:
-        glossary = (await conn.execute(query)).first()
+    try:
+        async with session.begin() as conn:
+            glossary = (await conn.execute(query)).first()
         return glossary
+    except Exception as ex:
+        logger.warning(ex)
 
 # ==================== Comment service ==================== #
 
@@ -336,8 +355,11 @@ async def list_article_comments(
         .where(ArticleComment.article_id==article_id)
         .order_by(ArticleComment.created_at.desc())
     )
-    async with session.begin() as conn:
-        result = (await conn.execute(query)).all()
+    try:
+        async with session.begin() as conn:
+            result = (await conn.execute(query)).all()
+    except Exception as ex:
+        logger.warning(ex)
     return [
         {
             "id": comment.id,
@@ -367,4 +389,5 @@ async def delete_my_article_comment(
     except CommentNotOwner as ex:
         logger.warning(ex)
         raise CommentNotOwner
-    
+    except IntegrityError as ex:
+        logger.warning(ex)

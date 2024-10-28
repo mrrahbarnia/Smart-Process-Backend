@@ -32,7 +32,6 @@ class LogConfig(BaseModel):
     formatters: dict = {
         "console": {
             "format": '%(asctime)s %(levelname)s %(module)s %(funcName)s %(process)d %(thread)d %(message)s',
-            # "class": "pythonjsonlogger.jsonlogger.JsonFormatter",
             "datefmt": "%Y-%m-%dT%H:%M:%SZ",
         }
     }
@@ -52,15 +51,19 @@ class LogConfig(BaseModel):
             'handlers': ['console'],
             'propagate': False,
         },
-        'payment': {
-            'handlers': ['console'],
-            'propagate': False,
-        },
         'admin': {
             'handlers': ['console'],
             'propagate': False,
         },
+        'products': {
+            'handlers': ['console'],
+            'propagate': False,
+        },
         'tickets': {
+            'handlers': ['console'],
+            'propagate': False,
+        },
+        's3': {
             'handlers': ['console'],
             'propagate': False,
         },

@@ -34,5 +34,5 @@ async def create_ticket(
         async with session.begin() as conn:
             await conn.execute(query)
     except IntegrityError as ex:
-        logger.warning(f"Tickets creation integrity error: {ex}")
+        logger.warning(ex)
         raise exceptions.TicketCreateException

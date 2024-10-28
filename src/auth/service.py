@@ -13,7 +13,6 @@ from src.auth import utils
 from src.auth.config import auth_config
 from src.auth.types import Password, UserId, PhoneNumber
 from src.auth.models import User
-from src.cart.service import create_cart
 
 logger = logging.getLogger("auth")
 
@@ -29,11 +28,15 @@ async def get_user_by_id(
         session: async_sessionmaker[AsyncSession]
 ) -> User:
     query = sa.select(User).where(User.id == id)
-    async with session.begin() as conn:
-        user: User | None = await conn.scalar(query)
-    if not user:
+    try:
+        async with session.begin() as conn:
+            user: User | None = await conn.scalar(query)
+            if not user:
+                raise exceptions.UserNotFound
+        return user
+    except exceptions.UserNotFound as ex:
+        logger.warning(ex)
         raise exceptions.UserNotFound
-    return user
 
 
 async def register(
@@ -59,6 +62,7 @@ async def register(
             ex=auth_config.VERIFICATION_CODE_LIFE_TIME_SECONDS
         )
     except IntegrityError as ex:
+        logger.warning(ex)
         if "uq_users_username" in str(ex):
             raise exceptions.UsernameAlreadyExists
         if "uq_users_phone_number" in str(ex):
@@ -71,18 +75,27 @@ async def login(
         payload: OAuth2PasswordRequestForm
 ) -> str:
     query = sa.select(User).where(User.phone_number == payload.username)
-    async with session.begin() as conn:
-        user: User | None = (await conn.scalar(query))
-    if not user:
+    try:
+        async with session.begin() as conn:
+            user: User | None = (await conn.scalar(query))
+            if not user:
+                raise exceptions.UserNotFound
+        if not utils.verify_password(
+            plain_password=payload.password, hashed_password=user.password
+        ):
+            raise exceptions.UserNotFound
+        if user.is_active is False:
+            raise exceptions.NotActiveUser
+        return utils.encode_access_token(user_id=user.id, user_role=user.role)
+    except exceptions.UserNotFound as ex:
+        logger.warning(ex)
         raise exceptions.UserNotFound
-    if not utils.verify_password(
-        plain_password=payload.password, hashed_password=user.password
-    ):
-        raise exceptions.UserNotFound
-    if user.is_active is False:
+    except exceptions.NotActiveUser as ex:
+        logger.warning(ex)
         raise exceptions.NotActiveUser
-
-    return utils.encode_access_token(user_id=user.id, user_role=user.role)
+    except IntegrityError as ex:
+        logger.warning(ex)
+        raise exceptions.UserNotFound
 
 
 async def verify_account(
@@ -99,12 +112,12 @@ async def verify_account(
         {
             User.is_active: True
         }
-    ).returning(User.id)
-    async with session.begin() as conn:
-        user_id: UserId | None = await conn.scalar(query)
-        if user_id:
-            await create_cart(user_id=user_id, conn=conn)
-
+    )
+    try:
+        async with session.begin() as conn:
+            await conn.execute(query)
+    except IntegrityError as ex:
+        logger.warning(ex)
 
 
 async def change_password(
@@ -122,8 +135,11 @@ async def change_password(
             User.password: new_hashed_password
         }
     )
-    async with session.begin() as conn:
-        await conn.execute(query)
+    try:
+        async with session.begin() as conn:
+            await conn.execute(query)
+    except IntegrityError as ex:
+        logger.warning(ex)
 
 
 async def reset_password(
@@ -133,15 +149,21 @@ async def reset_password(
         redis: Redis
 ) -> bool:
     query = sa.select(User.id).where(User.phone_number==phone_number)
-    async with session.begin() as conn:
-        user: User | None = await conn.scalar(query)
-    if user is None:
+    try:
+        async with session.begin() as conn:
+            user: User | None = await conn.scalar(query)
+            if user is None:
+                raise exceptions.UserNotFound
+        await redis.set(
+            name=f"reset_password:{random_password}",
+            value=phone_number,
+            ex=auth_config.RANDOM_PASSWORD_LIFE_TIME_SECONDS
+        )
+    except exceptions.UserNotFound as ex:
+        logger.warning(ex)
         raise exceptions.UserNotFound
-    await redis.set(
-        name=f"reset_password:{random_password}",
-        value=phone_number,
-        ex=auth_config.RANDOM_PASSWORD_LIFE_TIME_SECONDS
-    )
+    except Exception as ex:
+        logger.warning(ex)
     return True
 
 
@@ -161,8 +183,11 @@ async def verify_reset_password(
             User.password: new_hashed_password
         }
     )
-    async with session.begin() as conn:
-        await conn.execute(query)
+    try:
+        async with session.begin() as conn:
+            await conn.execute(query)
+    except IntegrityError as ex:
+        logger.warning(ex)
 
 
 async def resend_verification_code(
@@ -172,13 +197,19 @@ async def resend_verification_code(
         redis: Redis
 ) -> bool:
     query = sa.select(User.id).where(User.phone_number==phone_number)
-    async with session.begin() as conn:
-        result: User | None = await conn.scalar(query)
-    if result is None:
+    try:
+        async with session.begin() as conn:
+            result: User | None = await conn.scalar(query)
+            if result is None:
+                raise exceptions.UserNotFound
+        await redis.set(
+                name=f"verification_code:{verification_code}",
+                value=phone_number,
+                ex=auth_config.VERIFICATION_CODE_LIFE_TIME_SECONDS
+            )
+    except exceptions.UserNotFound as ex:
+        logger.warning(ex)
         raise exceptions.UserNotFound
-    await redis.set(
-            name=f"verification_code:{verification_code}",
-            value=phone_number,
-            ex=auth_config.VERIFICATION_CODE_LIFE_TIME_SECONDS
-        )
+    except Exception as ex:
+        logger.warning(ex)
     return True
