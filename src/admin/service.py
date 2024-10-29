@@ -830,6 +830,7 @@ async def delete_ticket(
         logger.warning(ex)
         raise exceptions.TicketNotFound
 
+# ==================== Article service ==================== #
 
 async def create_article(
         session: async_sessionmaker[AsyncSession],
@@ -864,6 +865,25 @@ async def create_article(
         upload_to_s3(file=image_file, unique_filename=image_unique_name)
         for image_unique_name, image_file in image_unique_names.items()
     ])
+
+
+async def delete_article(
+        session: async_sessionmaker[AsyncSession],
+        article_id: ArticleId
+) -> None:
+    image_query = sa.select(ArticleImage.url).where(
+        ArticleImage.article_id==article_id
+    )
+    query = sa.delete(Article).where(Article.id==article_id)
+    try:
+        async with session.begin() as conn:
+            result = list((await conn.scalars(image_query)).all())
+            await conn.execute(query)
+    except Exception as ex:
+        logger.warning(ex)
+    if result:
+        for image_name in result:
+            await delete_from_s3(image_name)
 
 # ==================== Tag service ==================== #
 

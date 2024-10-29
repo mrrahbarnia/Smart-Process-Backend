@@ -113,8 +113,8 @@ async def article_detail(
     try:
         async with session.begin() as conn:
             result = (await conn.execute(query)).first()
-            await conn.execute(update_views_query)
             if result is not None:
+                await conn.execute(update_views_query)
                 return result._asdict()
             else:
                 raise exceptions.ArticleNotFound
