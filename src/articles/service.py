@@ -42,25 +42,23 @@ image_cte = sa.select(
 async def list_articles(
         engine: AsyncEngine,
         limit: int,
-        offset: int
+        offset: int,
+        tag_name: str | None
 ) -> dict | None:
     
     query = (
         sa.select(
             Article.id,
             Article.title,
+            sa.func.array_agg(ArticleTag.tag_name).label("tags"),
             Article.description,
             Article.created_at,
             rating_cte.c.average_rating,
-            sa.func.array_agg(Tag.name).label("tags"),
             image_cte.c.image
         )
         .select_from(Article)
 
-        # TODO: inner join for images
-    
         .join(ArticleTag, Article.id==ArticleTag.article_id, isouter=True)
-        .join(Tag, Tag.name==ArticleTag.tag_name, isouter=True)
         .join(rating_cte, Article.id==rating_cte.c.rating_article_id, isouter=True)
         .join(image_cte, Article.id==image_cte.c.image_article_id, isouter=True)
         .group_by(
@@ -69,7 +67,10 @@ async def list_articles(
             image_cte.c.image
         ).order_by(Article.created_at.desc())
     )
+    if tag_name:
+        query = query.having(sa.any_(sa.func.array_agg(ArticleTag.tag_name)) == tag_name)
     result = await paginate(engine=engine, query=query, limit=limit, offset=offset)
+    print(result)
     if result:
         return result
     return None
@@ -120,8 +121,8 @@ async def article_detail(
                 raise exceptions.ArticleNotFound
     
     except exceptions.ArticleNotFound as ex:
-        logger.info(ex)
-        return None
+        logger.warning(ex)
+        raise exceptions.ArticleNotFound
 
     except IntegrityError as ex:
         logger.warning(ex)

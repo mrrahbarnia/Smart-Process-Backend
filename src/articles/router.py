@@ -24,10 +24,12 @@ router = APIRouter()
 )
 async def list_articles(
         engine: Annotated[AsyncEngine, Depends(get_session)],
-        pagination_info: Annotated[PaginationQuerySchema, Depends(pagination_query)]
+        pagination_info: Annotated[PaginationQuerySchema, Depends(pagination_query)],
+        tag_name: str | None = None,
 ):
     result = await service.list_articles(
         engine=engine,
+        tag_name=tag_name,
         limit=pagination_info.limit,
         offset=pagination_info.offset
     )
@@ -97,6 +99,12 @@ async def most_viewed_articles(
     )
     return result
 
+
+# @router.get(
+#     "/articles/{tag_name}/",
+
+# )
+
 # ==================== Rating routes ==================== #
 
 @router.put(
@@ -126,7 +134,7 @@ async def rating_article(
 async def search_tag_by_name(
     tag_name: str,
     session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)]
-) -> list[str]:
+) -> list[str] | None:
     result = await service.search_tag_by_name(
         session=session,
         tag_name=tag_name
