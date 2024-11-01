@@ -1103,6 +1103,8 @@ async def update_glossary(
         raise exceptions.GlossaryNotFound
     except IntegrityError as ex:
         logger.warning(ex)
+        if "uq_glossary_terms_term" in str(ex):
+            raise exceptions.UniqueConstraintGlossary
 
 # ==================== ArticleComment service ==================== #
 

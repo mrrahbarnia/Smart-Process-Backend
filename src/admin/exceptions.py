@@ -144,3 +144,9 @@ class GlossaryNotFound(HTTPException):
     def __init__(self) -> None:
         self.status_code = status.HTTP_404_NOT_FOUND
         self.detail = "There is no glossary with the provided info!"
+
+
+class UniqueConstraintGlossary(HTTPException):
+    def __init__(self) -> None:
+        self.status_code = status.HTTP_409_CONFLICT
+        self.detail = "Term and article_id are unique together!"

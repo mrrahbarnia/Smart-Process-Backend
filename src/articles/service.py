@@ -70,7 +70,6 @@ async def list_articles(
     if tag_name:
         query = query.having(sa.any_(sa.func.array_agg(ArticleTag.tag_name)) == tag_name)
     result = await paginate(engine=engine, query=query, limit=limit, offset=offset)
-    print(result)
     if result:
         return result
     return None
@@ -85,17 +84,15 @@ async def article_detail(
             Article.id,
             Article.title,
             Article.description,
-            Article.views,
             Article.created_at,
             rating_cte.c.average_rating,
             sa.func.array_agg(sa.func.distinct(ArticleImage.url)).label("images"),
-            sa.func.array_agg(sa.func.distinct(Tag.name)).label("tags"),
+            sa.func.array_agg(sa.func.distinct(ArticleTag.tag_name)).label("tags"),
         )
         .select_from(Article)
         .join(rating_cte, Article.id==rating_cte.c.rating_article_id, isouter=True)
         .join(ArticleImage, Article.id==ArticleImage.article_id, isouter=True)
         .join(ArticleTag, Article.id==ArticleTag.article_id, isouter=True)
-        .join(Tag, ArticleTag.tag_name==Tag.name, isouter=True)
         .group_by(
             Article.id,
             Article.title,
@@ -119,7 +116,7 @@ async def article_detail(
                 return result._asdict()
             else:
                 raise exceptions.ArticleNotFound
-    
+
     except exceptions.ArticleNotFound as ex:
         logger.warning(ex)
         raise exceptions.ArticleNotFound

@@ -56,12 +56,11 @@ class ArticlesList(ArticleOneImage):
 
 class ArticleDetail(ArticleBase):
     description: str
-    tags: list[str]
+    tags: list[str | None]
     average_rating: Annotated[
         Decimal | None,
         Field(ge=0, le=5, alias="averageRating")
     ] = Decimal(0)
-    views: int
     images: list[str]
     created_at: Annotated[datetime, Field(alias="createdAt")]
 
