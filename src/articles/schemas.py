@@ -29,7 +29,7 @@ class ArticleNewest(ArticleOneImage):
 
 class ArticlePopular(ArticleOneImage):
     average_rating: Annotated[
-        str | None, Field(alias="averageRating")
+        str | Decimal | None, Field(alias="averageRating")
     ]
 
 

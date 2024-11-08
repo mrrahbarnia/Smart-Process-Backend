@@ -196,7 +196,7 @@ async def list_products(
     filter_query: Annotated[ProductQuerySearch, Query()],
     engine: Annotated[AsyncEngine, Depends(get_engine)],
     pagination_info: Annotated[PaginationQuerySchema, Depends(pagination_query)]
-) -> dict:
+) -> dict | None:
     result = await service.list_products(
         filter_query=filter_query,
         engine=engine,
@@ -220,6 +220,36 @@ async def product_detail(
         product_serial=product_serial
     )
     return result
+
+
+@router.get(
+    "/most-viewed/",
+    status_code=status.HTTP_200_OK,
+    response_model=list[schemas.MostViewedProducts]
+)
+async def most_viewed_products(
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+    redis: Annotated[Redis, Depends(get_redis)]
+):
+    return await service.most_viewed_products(
+        session=session,
+        redis=redis
+    )
+
+
+@router.get(
+    "/newest/",
+    status_code=status.HTTP_200_OK,
+    response_model=list[schemas.NewestProducts]
+)
+async def newest_products(
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+    redis: Annotated[Redis, Depends(get_redis)]
+):
+    return await service.newest_products(
+        session=session,
+        redis=redis
+    )
 
 # ==================== Guaranty routes ==================== #
 

@@ -36,6 +36,11 @@ from src.admin.exceptions import ProductNotFound
 
 logger = logging.getLogger("products")
 
+product_image_subquery = sa.select(
+    ProductImage.url,
+    ProductImage.product_id
+).distinct(ProductImage.product_id).subquery()
+
 # ==================== Brand services ==================== #
 
 async def active_brands(
@@ -276,10 +281,6 @@ async def list_products(
         limit: int,
         offset: int
 ) -> dict | None:
-    sub_query = sa.select(
-        ProductImage.url,
-        ProductImage.product_id
-    ).distinct(ProductImage.product_id).subquery()
     query = (
         sa.select(
             Product.id,
@@ -305,12 +306,12 @@ async def list_products(
             ).label("price_after_discount"),
             Category.name.label("category_name"),
             Brand.name.label("brand_name"),
-            sub_query.c.url.label("image_url")
+            product_image_subquery.c.url.label("image_url")
         )
         .select_from(Product)
         .join(Category, Product.category_id==Category.id)
         .join(Brand, Product.brand_id==Brand.id)
-        .join(sub_query, Product.id==sub_query.c.product_id)
+        .join(product_image_subquery, Product.id==product_image_subquery.c.product_id)
     )
 
     if filter_query.brand__exact:
@@ -446,6 +447,83 @@ async def product_detail(
         "image_urls": set([p.image_urls for p in result]),
         "attribute_values": attribute_values
     }
+
+
+async def most_viewed_products(
+        session: async_sessionmaker[AsyncSession],
+        redis: Redis
+):
+    if cached_data := await redis.get("most-viewed-products"):
+        return json.loads(cached_data)
+    query = (
+        sa.select(
+            Product.name,
+            Product.serial_number,
+            Product.views,
+            product_image_subquery.c.url.label("image")
+        )
+        .join(product_image_subquery, Product.id==product_image_subquery.c.product_id)
+        .order_by(Product.views.desc())
+        .limit(10)
+    )
+    try:
+        async with session.begin() as conn:
+            result = (await conn.execute(query)).all()
+            result_list = [
+                {
+                    "name": product.name,
+                    "serial_number": product.serial_number,
+                    "views": product.views,
+                    "image": product.image
+                } for product in result
+            ]
+            await redis.set(
+                name="most-viewed-products",
+                value=json.dumps(result_list),
+                ex=180
+            )
+            return result
+        
+    except Exception as ex:
+        logger.warning(ex)
+
+
+async def newest_products(
+        session: async_sessionmaker[AsyncSession],
+        redis: Redis
+):
+    if cached_data := await redis.get("newest-products"):
+        return json.loads(cached_data)
+    query = (
+        sa.select(
+            Product.name,
+            Product.serial_number,
+            Product.created_at,
+            product_image_subquery.c.url.label("image")
+        )
+        .join(product_image_subquery, Product.id==product_image_subquery.c.product_id)
+        .order_by(Product.created_at.desc())
+    )
+    try:
+        async with session.begin() as conn:
+            result = (await conn.execute(query)).all()
+            result_list = [
+                {
+                    "name": product.name,
+                    "serial_number": product.serial_number,
+                    "created_at": str(product.created_at),
+                    "image": product.image
+                } for product in result
+            ]
+            await redis.set(
+                name="newest-products",
+                value=json.dumps(result_list),
+                ex=180
+            )
+            return result
+        
+    except Exception as ex:
+        logger.warning(ex)
 
 # ==================== Guaranty service ==================== #
 

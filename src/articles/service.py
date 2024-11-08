@@ -171,17 +171,42 @@ async def popular_articles(
 ):
     if cached_data := await redis.get(name="popular_articles"):
         return json.loads(cached_data)
+
+    rating_cte = sa.select(
+        Rating.article_id.label("rating_article_id"),
+        sa.func.avg(Rating.rating).label("average_rating")
+    ).group_by(Rating.article_id).cte()
+
+    image_cte = sa.select(
+        ArticleImage.article_id.label("image_article_id"),
+        (sa.func.min(ArticleImage.url)).label("image")
+    ).group_by(ArticleImage.article_id).cte()
     query = (
         sa.select(
             Article.id,
             Article.title,
-            rating_cte.c.average_rating,
+            sa.case(
+                (
+                    (
+                        rating_cte.c.average_rating.is_(None)
+                    ),
+                    0
+                ),
+                else_=rating_cte.c.average_rating
+            ).label("average_rating"),
             image_cte.c.image
         )
         .select_from(Article)
         .join(rating_cte, Article.id==rating_cte.c.rating_article_id, isouter=True)
         .join(image_cte, Article.id==image_cte.c.image_article_id)
-        .order_by(rating_cte.c.average_rating.desc())
+        .order_by(
+            sa.case(
+                (
+                    (rating_cte.c.average_rating.is_(None)),
+                    0
+                ), else_=rating_cte.c.average_rating
+            ).desc()
+        )
         .limit(10)
     )
     try:
@@ -193,7 +218,7 @@ async def popular_articles(
         {
             "id": str(article.id),
             "title": article.title,
-            "average_rating": article.average_rating,
+            "average_rating": str(article.average_rating),
             "image": article.image
         } for article in articles
     ]
