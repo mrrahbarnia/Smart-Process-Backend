@@ -510,17 +510,18 @@ async def create_product(
                     } for image_name in image_unique_names
                 ]
             )
-            attribute_query = sa.insert(AttributeValue).values(
-                [
-                    {
-                        AttributeValue.value: attribute_value.value,
-                        AttributeValue.attribute_name: attribute_value.attribute,
-                        AttributeValue.product_id: product_id
-                    } for attribute_value in payload.attribute_values
-                ]
-            )
+            if len(payload.attribute_values) >= 1:
+                attribute_query = sa.insert(AttributeValue).values(
+                    [
+                        {
+                            AttributeValue.value: attribute_value.value,
+                            AttributeValue.attribute_name: attribute_value.attribute,
+                            AttributeValue.product_id: product_id
+                        } for attribute_value in payload.attribute_values
+                    ]
+                )
+                await conn.execute(attribute_query)
             await conn.execute(image_query)
-            await conn.execute(attribute_query)
     except exceptions.CategoryNotFound as ex:
         logger.warning(ex)
         raise exceptions.CategoryNotFound

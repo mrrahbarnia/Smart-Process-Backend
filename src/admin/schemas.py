@@ -18,7 +18,6 @@ from src.products import types as product_types
 from src.s3.config import storage_config
 from src.tickets.schemas import TicketIn
 from src.tickets.types import TicketId
-from src.articles.types import GlossaryId
 
 
 class Brand(BaseModel):
@@ -77,9 +76,32 @@ class ProductBase(CustomBaseModel):
 
 
 class ProductIn(ProductBase):
+    model_config = ConfigDict(json_schema_extra={
+        "examples": [
+            {
+                    
+                "discount": 10,
+                "categoryName": "Camera",
+                "price": 120000000,
+                "name": "DH-IPC-HDW2439TP-AS-LED-S2",
+                "brandName": "Hikvision",
+                "expiryDiscount": "2024-11-08",
+                "stock": 43,
+                "description": "this is my first product.",
+                "serialNumber": "PR2309",
+                "attributeValues": [
+                    {
+                        "attribute": "color",
+                        "value": "white"
+                    }
+                ]
+            }
+            
+        ]
+    })
     description: str
     expiry_discount: Annotated[date | None, Field(alias="expiryDiscount")] = None
-    attribute_values: Annotated[list[AttributeValueIn], Field(alias="attributeValues")]
+    attribute_values: Annotated[list[AttributeValueIn], Field(alias="attributeValues")] = []
 
     @model_validator(mode="before")
     @classmethod

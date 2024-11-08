@@ -419,9 +419,15 @@ async def product_detail(
             )
         )
     )
+    update_query = sa.update(Product).values(
+        {
+            Product.views: Product.views + 1
+        }
+    ).where(Product.serial_number==product_serial)
     try:
         async with session.begin() as conn:
             result = (await conn.execute(query)).all()
+            await conn.execute(update_query)
     except Exception as ex:
         logger.warning(ex)
 
