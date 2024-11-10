@@ -772,7 +772,7 @@ async def process_excel_data(
             "product_name": row[2],
             "guaranty_days": row[3],
             "produced_at": row[4].replace(" ق.ظ", "").replace(" ب.ظ", "")
-        } for row in sheet.iter_rows(min_row=1, values_only=True)
+        } for row in sheet.iter_rows(min_row=2, values_only=True)
     ]
 
     def chunks(data: list, chunk_size: int):

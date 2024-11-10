@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import sqlalchemy as sa
+import httpx
 
 from redis.asyncio import Redis
 from fastapi.security import OAuth2PasswordRequestForm
@@ -18,9 +19,16 @@ logger = logging.getLogger("auth")
 
 
 async def send_message(phone_number: PhoneNumber, subject: str):
-    # TODO: Delete this part for production
-    await asyncio.sleep(5)
-    logger.warning(f"Sending {subject} to {phone_number}...")
+    url = auth_config.SMS_URL
+    api_key = auth_config.SMS_API_KEY
+    sender = auth_config.SMS_SENDER
+    complete_url = f"{url}/{api_key}/sms/send.json?receptor={phone_number}&sender={sender}&message={subject}"
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(complete_url)
+        if response.status_code != 200:
+            logger.error("There is an issue in sms service!")
+            raise exceptions.MessageServiceError
 
 
 async def get_user_by_id(
