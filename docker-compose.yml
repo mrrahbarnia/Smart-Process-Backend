@@ -9,10 +9,10 @@ services:
     container_name: app
     command: >
       sh -c "
-            uvicorn src.main:app --host=0.0.0.0 --reload
-            alembic revision --autogenerate -m "init"
-            alembic upgrade head
-          "
+              uvicorn src.main:app --host=0.0.0.0 --reload
+              alembic revision --autogenerate -m "init"
+              alembic upgrade head
+            "
     ports:
       - '8000:8000'
     env_file:
