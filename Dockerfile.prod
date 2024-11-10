@@ -8,8 +8,6 @@ COPY ./requirements/base.txt /tmp/base.txt
 COPY ./requirements/prod.txt /tmp/prod.txt
 COPY . .
 
-RUN chmod +x -R /entrypoint
-
 RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r /tmp/prod.txt
 
