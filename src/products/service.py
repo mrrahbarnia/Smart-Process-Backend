@@ -509,6 +509,7 @@ async def newest_products(
         )
         .join(product_image_subquery, Product.id==product_image_subquery.c.product_id)
         .order_by(Product.created_at.desc())
+        .limit(10)
     )
     try:
         async with session.begin() as conn:
