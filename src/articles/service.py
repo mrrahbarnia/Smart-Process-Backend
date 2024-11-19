@@ -160,7 +160,7 @@ async def newest_articles(
     await redis.set(
         name="newest_articles",
         value=json.dumps(articles_list),
-        ex=180   
+        ex=1140
     )
     return articles
 
@@ -225,7 +225,7 @@ async def popular_articles(
     await redis.set(
         name="popular_articles",
         value=json.dumps(articles_list),
-        ex=180   
+        ex=300 
     )
     return articles
 
@@ -264,7 +264,7 @@ async def most_viewed_articles(
     await redis.set(
         name="most_viewed_articles",
         value=json.dumps(articles_list),
-        ex=180   
+        ex=180
     )
     return articles
 

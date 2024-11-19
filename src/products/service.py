@@ -525,10 +525,10 @@ async def newest_products(
             await redis.set(
                 name="newest-products",
                 value=json.dumps(result_list),
-                ex=180
+                ex=1020
             )
             return result
-        
+
     except Exception as ex:
         logger.warning(ex)
 
