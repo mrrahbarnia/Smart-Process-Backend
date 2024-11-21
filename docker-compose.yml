@@ -10,8 +10,6 @@ services:
     command: >
       sh -c "
               uvicorn src.main:app --host=0.0.0.0 --reload
-              alembic revision --autogenerate -m "init"
-              alembic upgrade head
             "
     ports:
       - '8000:8000'
@@ -24,6 +22,8 @@ services:
       - dev-db
       - redis
     restart: always
+    networks:
+      - a
 
   redis_listener:
     build:
@@ -42,6 +42,8 @@ services:
       - dev-db
       - app
     restart: always
+    networks:
+      - a
 
   dev-db:
     image: postgres:16.1-alpine3.19
@@ -52,6 +54,8 @@ services:
       - "5432:5432"
     volumes:
       - devdb-volume:/var/lib/postgresql/data
+    networks:
+      - a
 
   pgadmin:
     image: dpage/pgadmin4
@@ -63,6 +67,8 @@ services:
       - "8080:80"
     depends_on:
       - dev-db
+    networks:
+      - a
 
   redis:
     image: redis:7.2-alpine
@@ -72,9 +78,13 @@ services:
       - "6379:6379"
     volumes:
       - redis-volume:/data
+    networks:
+      - a
 
 
 name: smart-process-development
 volumes:
   devdb-volume:
   redis-volume:
+networks:
+  a:
