@@ -178,6 +178,10 @@ class ArticleIn(CustomBaseModel):
         return value
 
 
+class ArticleUpdate(ArticleIn):
+    old_deleted_images: list[str]
+
+
 class GlossaryIn(CustomBaseModel):
     term: Annotated[str, Field(max_length=250)]
     definition: str

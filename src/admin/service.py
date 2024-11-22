@@ -3,6 +3,7 @@ import asyncio
 import sqlalchemy as sa
 import sqlalchemy.orm as so
 
+from typing import BinaryIO
 from io import BytesIO
 from openpyxl import load_workbook # type: ignore
 from fastapi import UploadFile
@@ -17,7 +18,8 @@ from src.admin.models import Guaranty
 from src.admin.types import AdminProductDetailResponse, ExcelEntityTypes
 from src.admin.utils import (
     validate_images_and_return_unique_image_names,
-    create_unique_excel_name
+    create_unique_excel_name,
+    return_unique_image_names
 )
 from src.pagination import paginate
 from src.products.types import (
@@ -48,7 +50,12 @@ from src.articles.models import (
     GlossaryTerm,
     ArticleComment
 )
-from src.articles.types import ArticleId, GlossaryId, ArticleCommentId
+from src.articles.types import (
+    ArticleId,
+    GlossaryId,
+    ArticleCommentId,
+    ArticleImageId
+)
 from src.articles.exceptions import ArticleNotFound
 
 logger = logging.getLogger("admin")
@@ -866,6 +873,63 @@ async def create_article(
         upload_to_s3(file=image_file, unique_filename=image_unique_name)
         for image_unique_name, image_file in image_unique_names.items()
     ])
+
+
+async def update_article(
+        session: async_sessionmaker[AsyncSession],
+        article_id: ArticleId,
+        payload: schemas.ArticleUpdate,
+        new_images: list[UploadFile]
+) -> None:
+    image_unique_names: dict[str, BinaryIO] = await return_unique_image_names(new_images)
+    update_query = (
+        sa.update(Article)
+        .values(
+            {
+                Article.title: payload.title,
+                Article.description: payload.description
+            }
+        )
+        .where(Article.id==article_id)
+        .returning(Article.id)
+    )
+    insert_new_images = (
+        sa.insert(ArticleImage)
+        .values([
+            {
+                ArticleImage.article_id: article_id,
+                ArticleImage.url: image
+            } for image in image_unique_names
+        ])
+    )
+    delete_images_query = (
+        sa.delete(ArticleImage)
+        .where(
+            sa.and_(
+                ArticleImage.article_id==article_id,
+                ArticleImage.url.in_(payload.old_deleted_images)
+            )
+        )
+        .returning(ArticleImage.id)
+    )
+    try:
+        async with session.begin() as conn:
+            result: ArticleId | None = await conn.scalar(update_query)
+            if result is None:
+                raise ArticleNotFound
+            await conn.execute(delete_images_query)
+            await conn.execute(insert_new_images)
+    except Exception as ex:
+        if ex == "There is no article with the provided ID!":
+            print("YES")
+        print(ex)
+
+    await asyncio.gather(
+        *[delete_from_s3(image) for image in payload.old_deleted_images],
+        *[upload_to_s3(
+            file=image_file, unique_filename=image_unique_file
+        ) for image_unique_file, image_file in image_unique_names.items()]
+    )
 
 
 async def delete_article(

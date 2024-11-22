@@ -496,6 +496,25 @@ async def create_article(
     )
     return {"detail": "Created successfully."}
 
+
+@router.put(
+        "/update-article/{article_id}/",
+        status_code=status.HTTP_204_NO_CONTENT
+)
+async def update_article(
+    payload: schemas.ArticleUpdate,
+    article_id: ArticleId,
+    # is_admin: Annotated[bool, Depends(is_admin)],
+    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+    images: list[UploadFile],
+) -> None:
+    await service.update_article(
+        session=session,
+        article_id=article_id,
+        payload=payload,
+        new_images=images
+    )
+
 @router.delete(
     "/delete-article/{article_id}/",
     status_code=status.HTTP_204_NO_CONTENT
