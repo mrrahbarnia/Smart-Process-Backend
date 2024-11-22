@@ -1,6 +1,7 @@
 import logging
 import json
 import sqlalchemy as sa
+import sqlalchemy.orm as so
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
@@ -86,6 +87,40 @@ async def search_brand_by_name(
 
 # ==================== Category services ==================== #
 
+async def cached_categories(
+        session: async_sessionmaker[AsyncSession],
+        redis: Redis
+):
+    if cached_data := await redis.get("all-categories"):
+        return json.loads(cached_data)
+    parent_table = so.aliased(Category)
+    query = (
+        sa.select(Category.name, parent_table.name.label("parent_name"))
+        .select_from(Category)
+        .join(parent_table, Category.parent_id==parent_table.id, isouter=True)
+    )
+    try:
+        async with session.begin() as conn:
+            result = (
+                await conn.execute(query)
+            ).all()
+        if result:
+            categories_list = [
+                {
+                    "name": category.name,
+                    "parent_name": category.parent_name
+                } for category in result
+            ]
+            await redis.set(
+                name="all-categories",
+                value=json.dumps(categories_list),
+                ex=600
+            )
+            return result
+    except Exception as ex:
+        logger.warning(ex)
+
+
 async def search_category_by_name(
         session: async_sessionmaker[AsyncSession],
         category_name: str
@@ -99,68 +134,68 @@ async def search_category_by_name(
     return [cat for cat in result]
 
 
-async def root_categories(
-        session: async_sessionmaker[AsyncSession],
-        redis: Redis
-) -> list:
-    if cached_data := await redis.get("root-categories"):
-        return json.loads(cached_data)
-    query = sa.select(Category.id, Category.name).where(
-        sa.and_(
-            Category.parent_id.is_(None),
-            Category.is_active.is_(True)
-        )
-    )
-    try:
-        async with session.begin() as conn:
-            result = (await conn.execute(query)).all()
-    except Exception as ex:
-        logger.warning(ex)
-    result_list = [
-        {
-            "id": category.id,
-            "name": category.name
-        } for category in result
-    ]
-    await redis.set(
-        name="root-categories",
-        value=json.dumps(result_list),
-        ex=products_config.ROOT_CATEGORIES_CACHE_TTL
-    )
-    return result_list
+# async def root_categories(
+#         session: async_sessionmaker[AsyncSession],
+#         redis: Redis
+# ) -> list:
+#     if cached_data := await redis.get("root-categories"):
+#         return json.loads(cached_data)
+#     query = sa.select(Category.id, Category.name).where(
+#         sa.and_(
+#             Category.parent_id.is_(None),
+#             Category.is_active.is_(True)
+#         )
+#     )
+#     try:
+#         async with session.begin() as conn:
+#             result = (await conn.execute(query)).all()
+#     except Exception as ex:
+#         logger.warning(ex)
+#     result_list = [
+#         {
+#             "id": category.id,
+#             "name": category.name
+#         } for category in result
+#     ]
+#     await redis.set(
+#         name="root-categories",
+#         value=json.dumps(result_list),
+#         ex=products_config.ROOT_CATEGORIES_CACHE_TTL
+#     )
+#     return result_list
 
 
-async def sub_categories(
-        session: async_sessionmaker[AsyncSession],
-        redis: Redis,
-        parent_id: int
-) -> list:
-    if cached_data := await redis.get(f"sub-categories:{parent_id}"):
-        return json.loads(cached_data)
-    query = sa.select(Category.id, Category.name).where(
-        sa.and_(
-            Category.parent_id==parent_id,
-            Category.is_active.is_(True)
-        )
-    )
-    try:
-        async with session.begin() as conn:
-            result = (await conn.execute(query)).all()
-    except Exception as ex:
-        logger.warning(ex)
-    result_list = [
-        {
-            "id": category.id,
-            "name": category.name
-        } for category in result
-    ]
-    if result:
-        await redis.set(
-            name=f"sub-categories:{parent_id}",
-            value=json.dumps(result_list),
-            ex=products_config.SUB_CATEGORIES_CACHE_TTL
-        )
-    return result_list
+# async def sub_categories(
+#         session: async_sessionmaker[AsyncSession],
+#         redis: Redis,
+#         parent_id: int
+# ) -> list:
+#     if cached_data := await redis.get(f"sub-categories:{parent_id}"):
+#         return json.loads(cached_data)
+#     query = sa.select(Category.id, Category.name).where(
+#         sa.and_(
+#             Category.parent_id==parent_id,
+#             Category.is_active.is_(True)
+#         )
+#     )
+#     try:
+#         async with session.begin() as conn:
+#             result = (await conn.execute(query)).all()
+#     except Exception as ex:
+#         logger.warning(ex)
+#     result_list = [
+#         {
+#             "id": category.id,
+#             "name": category.name
+#         } for category in result
+#     ]
+#     if result:
+#         await redis.set(
+#             name=f"sub-categories:{parent_id}",
+#             value=json.dumps(result_list),
+#             ex=products_config.SUB_CATEGORIES_CACHE_TTL
+#         )
+#     return result_list
 
 async def list_assigned_attributes(
         category_name: str,

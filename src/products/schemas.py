@@ -59,3 +59,8 @@ class InquiryGuarantyOut(CustomBaseModel):
     product_name: Annotated[str, Field(alias="productName")]
     guaranty_days: Annotated[int, Field(alias="guarantyDays")]
     produced_at: Annotated[str, Field(alias="producedAt")]
+
+
+class CachedCategories(CustomBaseModel):
+    name: str
+    parent_name: Annotated[str | None, Field(alias="parentName")] = None

@@ -74,34 +74,49 @@ async def search_category_by_name(
 
 
 @router.get(
-    "/root-categories/",
-    status_code=status.HTTP_200_OK
+    "/cached-categories/",
+    status_code=status.HTTP_200_OK,
+    response_model=list[schemas.CachedCategories]
 )
-async def root_categories(
+async def all_categories(
     session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
     redis: Annotated[Redis, Depends(get_redis)]
 ) -> list:
-    result = await service.root_categories(
+    result = await service.cached_categories(
         session=session, redis=redis
     )
     return result
 
 
-@router.get(
-    "/sub-categories/{parent_id}/",
-    status_code=status.HTTP_200_OK
-)
-async def sub_categories(
-    parent_id: int,
-    session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
-    redis: Annotated[Redis, Depends(get_redis)]
-) -> list:
-    result = await service.sub_categories(
-        session=session,
-        redis=redis,
-        parent_id=parent_id
-    )
-    return result
+# @router.get(
+#     "/root-categories/",
+#     status_code=status.HTTP_200_OK
+# )
+# async def root_categories(
+#     session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+#     redis: Annotated[Redis, Depends(get_redis)]
+# ) -> list:
+#     result = await service.root_categories(
+#         session=session, redis=redis
+#     )
+#     return result
+
+
+# @router.get(
+#     "/sub-categories/{parent_id}/",
+#     status_code=status.HTTP_200_OK
+# )
+# async def sub_categories(
+#     parent_id: int,
+#     session: Annotated[async_sessionmaker[AsyncSession], Depends(get_session)],
+#     redis: Annotated[Redis, Depends(get_redis)]
+# ) -> list:
+#     result = await service.sub_categories(
+#         session=session,
+#         redis=redis,
+#         parent_id=parent_id
+#     )
+#     return result
 
 
 @router.get(
